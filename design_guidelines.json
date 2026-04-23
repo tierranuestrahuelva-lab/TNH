@@ -1,0 +1,114 @@
+{
+  "theme_and_archetype": {
+    "domain": "B2B SaaS / Wine Distribution (Tierra Nuestra Huelva)",
+    "theme": "Light & Dark Toggle (Equally optimized)",
+    "primary_archetype": "Archetype 5: Jewel & Luxury (mixed with Archetype 4 for data density)",
+    "vibe": "Sophisticated, Old-paper sommelier notebook (Light), Refined wine cellar (Dark). Premium, fast, data-dense.",
+    "forbidden_elements": ["Purple SaaS gradient", "Inter font for headings", "Generic e-commerce layouts", "Centered alignment for dense data"]
+  },
+  "typography": {
+    "fonts": {
+      "display_headings": "Cormorant Garamond (Used for Login, AI headers, Presentation mode titles)",
+      "ui_headings": "Manrope (Used for Dashboard widgets, Product Cards, Modal titles)",
+      "body_data": "IBM Plex Sans (Used for Data tables, dense descriptions, form inputs)"
+    },
+    "scale_and_rules": {
+      "h1": "text-4xl sm:text-5xl (tracking-tight) font-serif",
+      "h2": "text-2xl sm:text-3xl (tracking-tight) font-sans font-semibold",
+      "h3": "text-xl sm:text-2xl font-sans",
+      "body": "text-sm text-base for reading, text-sm for dense UI",
+      "labels_overlines": "text-xs tracking-[0.1em] uppercase font-semibold text-muted-foreground"
+    }
+  },
+  "color_palette": {
+    "light_mode": {
+      "background": "#FBF9F6",
+      "foreground": "#2A2A2A",
+      "card": "#FFFFFF",
+      "card_foreground": "#2A2A2A",
+      "primary": "#722F37",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#E1C488",
+      "secondary_foreground": "#4A3E26",
+      "accent": "#D4AF37",
+      "accent_foreground": "#2A2A2A",
+      "muted": "#EAE3D9",
+      "border": "#D8D0C5",
+      "ring": "#722F37"
+    },
+    "dark_mode": {
+      "background": "#0A0909",
+      "foreground": "#F2EFE9",
+      "card": "#141212",
+      "card_foreground": "#F2EFE9",
+      "primary": "#8C3B43",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#3D321F",
+      "secondary_foreground": "#E1C488",
+      "accent": "#D4AF37",
+      "accent_foreground": "#141212",
+      "muted": "#2A2526",
+      "border": "#362F30",
+      "ring": "#8C3B43"
+    },
+    "rules": {
+      "ai_elements": "Use Accent (#D4AF37 / Gold) to highlight AI buttons and AI recommendations.",
+      "glassmorphism": "Use sparingly on Sticky Headers or Product Quick Views (Dark: bg-black/60 backdrop-blur-xl border-white/10). No muddy transparency."
+    }
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Generous spacing for headers/containers (p-6, p-8). Tight spacing for data grids (gap-4).",
+    "main_layout": "Sidebar navigation (collapsible) + Topbar (Global search, Theme Toggle, Cart toggle) + Main Content Area.",
+    "filter_rail": "Horizontal scrollable pill section below Topbar for quick wine types (Tinto, Blanco, Rosado, Espumoso, Generoso).",
+    "dashboard_grid": "Bento Grid style (grid-cols-1 md:grid-cols-3 lg:grid-cols-4) with 1px border cards, tight gaps, flat solid backgrounds.",
+    "product_catalog": "Grid (cards) and List (dense rows) toggle. Each item must show name, winery, denomination, grapes, 4 price tiers."
+  },
+  "components": {
+    "global_search": "Command palette style or large prominent top bar input with deep integration for barcode scanning.",
+    "barcode_scanner": "Button with Lucide camera icon embedded in the search bar. Activates modal with scanning UI.",
+    "price_slider": "Shadcn Dual-range slider customized with Primary (Bordeaux) color track.",
+    "ai_assistant": "Floating Action Button or prominent Sidebar item. Clicking opens a side panel 'Claude Sonnet 4.5' chat UI for alternative recommendations and sales arguments.",
+    "shopping_cart_sidebar": {
+      "type": "Sheet (Shadcn) anchored to the right.",
+      "fields": "Commercial dropdown (Fernando, Ernesto, Tienda), Client Name input, Observations Textarea.",
+      "actions": "Export PDF, Send via Email (tnh@tierranuestrahuelva.es), Send via WhatsApp (+34699414559)."
+    },
+    "product_card": "Minimalist, thin borders. Use nested radii. Wine bottle image left/top. Clear typography for winery and pricing tiers.",
+    "login_screen": "Split screen: Left side beautiful vineyard/cellar imagery, Right side elegant login form using Cormorant Garamond headers.",
+    "presentation_mode": "A toggle that hides navigation and simplifies the UI to focus entirely on the product being presented to the client, using the generated luxury backgrounds."
+  },
+  "media_and_icons": {
+    "icons_library": "lucide-react (Default for crisp UI) and @phosphor-icons/react (for luxury duotone icons on marketing/login).",
+    "image_urls": {
+      "bordeaux_abstract_bg": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/3a73493d-4581-45fc-ad2c-15fb1962d0bc/images/0fa62c84c053974bcd2df77bc7eb740b93f358e6eb7403514129abca161a0695.png",
+        "description": "Generated abstract bordeaux fluid texture. Use for Presentation Mode background or Dark Mode Login screen.",
+        "category": "backgrounds"
+      },
+      "sommelier_paper_bg": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/3a73493d-4581-45fc-ad2c-15fb1962d0bc/images/2cfcf2aa7cbaf83c61071cb002c3711119d951c6e928cb2dfc0739950928f207.png",
+        "description": "Generated elegant textured off-white paper. Use for Light Mode Login screen or Presentation Mode.",
+        "category": "backgrounds"
+      },
+      "wine_cellar_dark": {
+        "url": "https://images.unsplash.com/photo-1773113634646-953447d509d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwyfHx3aW5lJTIwY2VsbGFyJTIwZGFyayUyMG1vb2R5fGVufDB8fHx8MTc3Njk2NDAyNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Wine bottles arranged on a rack. Can be used for empty states or dashboard banners.",
+        "category": "ui_elements"
+      },
+      "sommelier_pouring": {
+        "url": "https://images.unsplash.com/photo-1714836403365-6659229f4d53?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxzb21tZWxpZXIlMjB3aW5lJTIwdGFzdGluZ3xlbnwwfHx8fDE3NzY5NjQwMjR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "A man pouring wine. Can be used for the AI Assistant's avatar/welcome state.",
+        "category": "ui_elements"
+      }
+    }
+  },
+  "instructions_to_main_agent": {
+    "file_extensions": "USE ONLY .js AND .jsx FILES. NO TYPESCRIPT (.ts/.tsx).",
+    "data_testid_rule": "MUST add data-testid attribute to ALL buttons, inputs, form submissions, filter pills, cart actions.",
+    "testing_id_examples": "data-testid='filter-pill-tinto', data-testid='cart-checkout-whatsapp', data-testid='login-submit-button'",
+    "routing": "Ensure routing has private paths. Login -> Dashboard (Comparative) | Catalog | Order History.",
+    "state_management": "Use standard React Context or Zustand for Cart, Theme, and Commercial User session.",
+    "shadcn_customization": "Heavily customize shadcn config in tailwind.config.js to map to the color_palette colors exactly (primary, secondary, accent, background).",
+    "pdf_export": "Implement an elegant HTML to PDF library (like html2canvas/jspdf or standard window.print()) styled for professional invoices."
+  }
+}
