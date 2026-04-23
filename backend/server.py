@@ -622,17 +622,28 @@ async def ai_chat(body: AIMessageIn, user: Dict[str, Any] = Depends(current_user
     session_id = body.session_id or str(uuid.uuid4())
 
     # Build catalog context
-    catalog_ctx = await build_catalog_context(body.context_codigos, max_items=30)
+    catalog_ctx = await build_catalog_context(body.context_codigos, max_items=25)
+
+    # Load last turns of conversation history (bounded) and inline them in the system message
+    # Avoids O(N) replay LLM calls and stays within token budget.
+    history = await db.ai_messages.find(
+        {"session_id": session_id}, {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
+    last_turns = history[-12:]  # last 12 messages (~6 turns)
+    history_block = ""
+    if last_turns:
+        lines = []
+        for h in last_turns:
+            role = "Comercial" if h["role"] == "user" else "Sumiller IA"
+            lines.append(f"{role}: {h['content']}")
+        history_block = "\n\n--- HISTORIAL RECIENTE DE LA CONVERSACIÓN ---\n" + "\n".join(lines)
+
     system_with_ctx = (
         AI_SYSTEM
         + "\n\n--- CONTEXTO DEL CATÁLOGO (muestra de productos de TNH) ---\n"
         + catalog_ctx
+        + history_block
     )
-
-    # Load previous history (optional for short-term memory in one single-turn call)
-    history = await db.ai_messages.find(
-        {"session_id": session_id}, {"_id": 0}
-    ).sort("created_at", 1).to_list(50)
 
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
@@ -640,19 +651,17 @@ async def ai_chat(body: AIMessageIn, user: Dict[str, Any] = Depends(current_user
         system_message=system_with_ctx,
     ).with_model("anthropic", "claude-sonnet-4-5-20250929")
 
-    # Replay previous user messages to preserve some memory (library stores per-instance)
-    for h in history:
-        if h["role"] == "user":
-            try:
-                await chat.send_message(UserMessage(text=h["content"]))
-            except Exception:
-                pass
-
     try:
         reply = await chat.send_message(UserMessage(text=body.message))
     except Exception as e:
         logger.exception("AI error")
-        raise HTTPException(status_code=500, detail=f"Error IA: {str(e)[:200]}")
+        # Sanitize error message for client
+        detail = str(e)
+        if "budget" in detail.lower():
+            detail = "El servicio de IA está temporalmente saturado. Reintenta en unos segundos."
+        else:
+            detail = "No se pudo contactar con el Sumiller IA. Reintenta."
+        raise HTTPException(status_code=503, detail=detail)
 
     now = datetime.now(timezone.utc).isoformat()
     await db.ai_messages.insert_many(
