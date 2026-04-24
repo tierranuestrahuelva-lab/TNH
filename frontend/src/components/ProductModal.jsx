@@ -51,10 +51,10 @@ export default function ProductModal({ product, onClose }) {
                         <X className="h-5 w-5" />
                     </button>
                     <div className="flex items-start gap-4">
-                        <div className="h-16 w-16 rounded-xl bg-primary/15 flex items-center justify-center">
+                        <div className="h-16 w-16 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                             <Wine className="h-8 w-8 text-primary" />
                         </div>
-                        <div className="flex-1 pr-8">
+                        <div className="flex-1 pr-8 min-w-0">
                             <div className="overline">
                                 {product.categoria} · {product.tipo} · cód.{" "}
                                 <span className="font-semibold">{product.codigo}</span>
@@ -67,12 +67,63 @@ export default function ProductModal({ product, onClose }) {
                                     {product.volumen}
                                 </div>
                             )}
+
+                            {/* Status badges */}
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                {product.top_ventas && (
+                                    <span className="text-[10px] font-extrabold tracking-wider px-2 py-1 rounded-md bg-gradient-to-r from-orange-500 to-red-600 text-white">
+                                        🏆 TOP VENTAS{product.top_rank ? ` #${product.top_rank}` : ""}
+                                        {product.top_unidades ? ` · ${product.top_unidades.toLocaleString("es-ES")} ud.` : ""}
+                                    </span>
+                                )}
+                                {product.precio_calidad && (
+                                    <span
+                                        className="text-[10px] font-extrabold tracking-wider px-2 py-1 rounded-md"
+                                        style={{ background: "#d6a33c", color: "#3a2a08" }}
+                                    >
+                                        ⭐ MEJOR PRECIO / CALIDAD
+                                    </span>
+                                )}
+                                {product.tags?.map((t) => (
+                                    <span
+                                        key={t}
+                                        className="text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded-md border"
+                                        style={
+                                            t === "eco"
+                                                ? { background: "#1e7a3a22", color: "#1e7a3a", borderColor: "#1e7a3a" }
+                                                : t === "veg"
+                                                ? { background: "#2e8b5722", color: "#2e8b57", borderColor: "#2e8b57" }
+                                                : { background: "#0d503522", color: "#0d5035", borderColor: "#0d5035" }
+                                        }
+                                    >
+                                        {t === "eco" ? "🌱 ECO" : t === "veg" ? "🥬 VEG" : "🌾 BIO"}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* meta */}
                 <div className="p-6 space-y-4">
+                    {/* Ratings */}
+                    {product.ratings && Object.values(product.ratings).some((v) => v >= 90) && (
+                        <div>
+                            <div className="overline mb-2">Puntuaciones críticas</div>
+                            <div className="flex flex-wrap gap-2">
+                                {product.ratings.parker >= 90 && (
+                                    <RatingPill label="Robert Parker" value={product.ratings.parker} />
+                                )}
+                                {product.ratings.suckling >= 90 && (
+                                    <RatingPill label="James Suckling" value={product.ratings.suckling} />
+                                )}
+                                {product.ratings.penin >= 90 && (
+                                    <RatingPill label="Guía Peñín" value={product.ratings.penin} />
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <InfoRow icon={Building2} label="Bodega" value={product.bodega} />
                         <InfoRow icon={MapPin} label="Denominación" value={product.denominacion} />
@@ -147,6 +198,23 @@ function InfoRow({ icon: Icon, label, value }) {
                 </div>
                 <div className="font-data text-sm truncate">{value || "—"}</div>
             </div>
+        </div>
+    );
+}
+
+function RatingPill({ label, value }) {
+    return (
+        <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border bg-gradient-to-br from-[#d6a33c22] to-transparent"
+            style={{ borderColor: "#d6a33c55" }}
+        >
+            <span
+                className="inline-flex items-center justify-center h-7 w-7 rounded-full font-black text-[11px]"
+                style={{ background: "#d6a33c", color: "#3a2a08" }}
+            >
+                {value}
+            </span>
+            <span className="text-xs font-medium">{label}</span>
         </div>
     );
 }

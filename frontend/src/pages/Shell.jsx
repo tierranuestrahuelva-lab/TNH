@@ -41,13 +41,14 @@ export default function Shell() {
                 data-testid="sidebar"
                 className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-card/50 backdrop-blur relative z-10"
             >
-                <div className="px-6 py-7 border-b border-border">
-                    <div className="overline">Tierra Nuestra</div>
-                    <h1 className="font-display text-3xl leading-none mt-1">
-                        Huelva<span className="text-primary">.</span>
-                    </h1>
-                    <div className="mt-1 text-[11px] text-muted-foreground tracking-wide">
-                        Lo Más Pro · v1.0
+                <div className="px-6 py-6 border-b border-border">
+                    <img
+                        src="/brand/logo.webp"
+                        alt="Tierra Nuestra"
+                        className="h-12 w-auto dark:brightness-0 dark:invert"
+                    />
+                    <div className="mt-2 text-[10px] text-muted-foreground tracking-[0.2em] uppercase">
+                        Lo Más Pro · v1.1
                     </div>
                 </div>
 
@@ -103,8 +104,11 @@ export default function Shell() {
                     <div className="h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
                         {/* Mobile brand */}
                         <div className="lg:hidden flex items-center gap-2">
-                            <Wine className="h-5 w-5 text-primary" />
-                            <span className="font-display text-lg">TNH</span>
+                            <img
+                                src="/brand/logo.webp"
+                                alt="Tierra Nuestra"
+                                className="h-7 w-auto dark:brightness-0 dark:invert"
+                            />
                         </div>
 
                         {/* Path breadcrumb (desktop) */}

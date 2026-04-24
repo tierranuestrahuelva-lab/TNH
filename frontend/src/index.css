@@ -3,18 +3,18 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------ */
-/* FONTS: Cormorant Garamond (display) + Manrope (UI) + IBM Plex Sans  */
+/* Brand fonts from tierranuestra.es: Sora + Space Grotesk             */
 /* ------------------------------------------------------------------ */
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&display=swap");
 
 html,
 body {
     margin: 0;
     padding: 0;
-    font-family: "Manrope", system-ui, -apple-system, sans-serif;
+    font-family: "Sora", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
 }
 
 body {
@@ -25,75 +25,87 @@ body {
 .font-display {
     font-family: "Cormorant Garamond", Georgia, serif;
     letter-spacing: -0.015em;
+    font-weight: 500;
+}
+
+.font-brand {
+    font-family: "Space Grotesk", "Sora", sans-serif;
+    letter-spacing: -0.01em;
 }
 
 .font-data {
-    font-family: "IBM Plex Sans", sans-serif;
+    font-family: "Space Grotesk", "Sora", sans-serif;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0;
 }
 
 /* ------------------------------------------------------------------ */
-/* COLOR SYSTEM — Bordeaux / Sherry Gold / Charcoal                   */
+/* COLOR SYSTEM — Brand Bordeaux #8d0444 (from tierranuestra.es)       */
 /* ------------------------------------------------------------------ */
 @layer base {
     :root {
-        /* Light — sommelier paper */
-        --background: 36 28% 97%;
-        --foreground: 0 0% 16%;
+        /* Light */
+        --background: 36 25% 97%;
+        --foreground: 340 30% 12%;
         --card: 0 0% 100%;
-        --card-foreground: 0 0% 16%;
+        --card-foreground: 340 30% 12%;
         --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 16%;
-        --primary: 353 42% 32%; /* Bordeaux #722F37 */
+        --popover-foreground: 340 30% 12%;
+        --primary: 334 95% 28%; /* #8d0444 */
         --primary-foreground: 0 0% 100%;
-        --secondary: 38 57% 71%; /* Sherry gold soft */
-        --secondary-foreground: 35 32% 22%;
-        --muted: 35 28% 88%;
-        --muted-foreground: 0 0% 38%;
-        --accent: 46 65% 52%; /* Gold #D4AF37 */
-        --accent-foreground: 0 0% 14%;
+        --secondary: 334 40% 92%; /* soft rosé */
+        --secondary-foreground: 334 50% 22%;
+        --muted: 35 22% 92%;
+        --muted-foreground: 340 10% 38%;
+        --accent: 43 72% 52%; /* warm gold accent */
+        --accent-foreground: 340 30% 15%;
         --destructive: 0 62% 46%;
         --destructive-foreground: 0 0% 100%;
-        --border: 35 19% 82%;
-        --input: 35 19% 86%;
-        --ring: 353 42% 32%;
-        --chart-1: 353 42% 32%;
-        --chart-2: 46 65% 52%;
-        --chart-3: 205 35% 35%;
-        --chart-4: 30 40% 55%;
-        --chart-5: 140 25% 40%;
+        --border: 35 15% 85%;
+        --input: 35 15% 90%;
+        --ring: 334 95% 28%;
+        --chart-1: 334 95% 28%;
+        --chart-2: 43 72% 52%;
+        --chart-3: 205 45% 38%;
+        --chart-4: 145 35% 42%;
+        --chart-5: 25 75% 55%;
         --radius: 0.65rem;
 
-        --grain-opacity: 0.035;
+        --brand-primary: #8d0444;
+        --brand-primary-ink: #5a022b;
+        --brand-gold: #d6a33c;
+        --grain-opacity: 0.025;
     }
     .dark {
-        /* Dark — wine cellar */
-        --background: 0 8% 4%;
-        --foreground: 36 28% 94%;
-        --card: 0 8% 7%;
-        --card-foreground: 36 28% 94%;
-        --popover: 0 8% 7%;
-        --popover-foreground: 36 28% 94%;
-        --primary: 353 40% 39%; /* lighter bordeaux for dark */
+        /* Dark — wine cellar + brand red */
+        --background: 340 20% 5%;
+        --foreground: 35 25% 94%;
+        --card: 340 18% 9%;
+        --card-foreground: 35 25% 94%;
+        --popover: 340 18% 9%;
+        --popover-foreground: 35 25% 94%;
+        --primary: 334 80% 48%; /* brighter for dark */
         --primary-foreground: 0 0% 100%;
-        --secondary: 35 30% 18%;
-        --secondary-foreground: 38 57% 71%;
-        --muted: 0 4% 14%;
-        --muted-foreground: 36 12% 66%;
-        --accent: 46 65% 52%;
-        --accent-foreground: 0 8% 7%;
+        --secondary: 334 30% 18%;
+        --secondary-foreground: 334 40% 82%;
+        --muted: 340 15% 14%;
+        --muted-foreground: 35 12% 64%;
+        --accent: 43 72% 55%;
+        --accent-foreground: 340 18% 9%;
         --destructive: 0 62% 46%;
         --destructive-foreground: 0 0% 100%;
-        --border: 0 6% 18%;
-        --input: 0 6% 18%;
-        --ring: 353 40% 44%;
-        --chart-1: 353 56% 56%;
-        --chart-2: 46 65% 62%;
-        --chart-3: 205 42% 55%;
-        --chart-4: 30 50% 60%;
-        --chart-5: 140 35% 55%;
+        --border: 340 15% 18%;
+        --input: 340 15% 18%;
+        --ring: 334 80% 48%;
+        --chart-1: 334 78% 58%;
+        --chart-2: 43 72% 62%;
+        --chart-3: 205 55% 58%;
+        --chart-4: 145 45% 58%;
+        --chart-5: 25 75% 62%;
 
-        --grain-opacity: 0.06;
+        --brand-primary: #bf1660;
+        --brand-gold: #e4b85c;
+        --grain-opacity: 0.05;
     }
 }
 
@@ -104,7 +116,7 @@ body {
     body {
         @apply bg-background text-foreground;
     }
-    /* subtle film grain for premium feel */
+    /* subtle film grain */
     body::after {
         content: "";
         position: fixed;
@@ -120,6 +132,7 @@ body {
 @layer components {
     .overline {
         @apply text-[11px] uppercase tracking-[0.14em] font-semibold text-muted-foreground;
+        font-family: "Space Grotesk", "Sora", sans-serif;
     }
 
     .btn-pill {
@@ -136,7 +149,7 @@ body {
     .gold-underline {
         background-image: linear-gradient(
             transparent 60%,
-            hsl(var(--accent) / 0.35) 60%
+            hsl(var(--accent) / 0.4) 60%
         );
         background-repeat: no-repeat;
         background-size: 100% 100%;
@@ -179,6 +192,55 @@ body {
     .stagger-in > *:nth-child(6) { animation-delay: 0.18s; }
     .stagger-in > *:nth-child(7) { animation-delay: 0.21s; }
     .stagger-in > *:nth-child(8) { animation-delay: 0.24s; }
+
+    /* Brand quick-filter pills */
+    .pill-eco {
+        background: #1e7a3a22 !important; color: #1e7a3a !important; border-color: #1e7a3a40 !important;
+    }
+    .pill-eco[data-active="true"] {
+        background: #1e7a3a !important; color: #fff !important; border-color: #1e7a3a !important;
+    }
+    .pill-veg {
+        background: #2e8b5722 !important; color: #2e8b57 !important; border-color: #2e8b5740 !important;
+    }
+    .pill-veg[data-active="true"] {
+        background: #2e8b57 !important; color: #fff !important; border-color: #2e8b57 !important;
+    }
+    .pill-bio {
+        background: #0d503522 !important; color: #0d5035 !important; border-color: #0d503540 !important;
+    }
+    .pill-bio[data-active="true"] {
+        background: #0d5035 !important; color: #fff !important; border-color: #0d5035 !important;
+    }
+    .pill-top {
+        background: #d67c2022 !important; color: #c06310 !important; border-color: #d67c2055 !important;
+    }
+    .pill-top[data-active="true"] {
+        background: linear-gradient(135deg, #d67c20, #c92222) !important; color: #fff !important; border-color: #c06310 !important;
+    }
+    .pill-star {
+        background: #d6a33c22 !important; color: #8a6420 !important; border-color: #d6a33c55 !important;
+    }
+    .pill-star[data-active="true"] {
+        background: #d6a33c !important; color: #4a3a10 !important; border-color: #8a6420 !important;
+    }
+
+    /* ratings badge */
+    .rating-badge {
+        @apply inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md;
+        background: color-mix(in srgb, #d6a33c 18%, transparent);
+        color: #8a6420;
+        border: 1px solid color-mix(in srgb, #d6a33c 40%, transparent);
+        font-family: "Space Grotesk", sans-serif;
+    }
+    .dark .rating-badge {
+        background: color-mix(in srgb, #d6a33c 14%, transparent);
+        color: #e4b85c;
+    }
+
+    .glow-gold {
+        box-shadow: 0 0 0 1px rgba(212, 163, 60, 0.35), 0 6px 20px -8px rgba(212, 163, 60, 0.4);
+    }
 }
 
 @keyframes shimmer {
@@ -204,9 +266,8 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.5); }
 
-/* selection */
 ::selection {
-    background: hsl(var(--accent) / 0.35);
+    background: hsl(var(--accent) / 0.45);
     color: hsl(var(--foreground));
 }
 

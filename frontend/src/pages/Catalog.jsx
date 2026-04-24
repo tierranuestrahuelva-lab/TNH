@@ -26,13 +26,24 @@ const QUICK_CATS = [
     { key: "rosado", label: "Rosado", color: "bg-[#e8a7b7] text-[#5a1f2b]" },
     { key: "espumoso", label: "Espumoso", color: "bg-[#f6e9b0] text-[#5a4214]" },
     { key: "generoso", label: "Generoso", color: "bg-[#b98b3f] text-white" },
-    { key: "licor", label: "Licor", color: "bg-[#2e3a4a] text-white" },
+    { key: "licor", label: "Spirits", color: "bg-[#2e3a4a] text-white" },
+];
+
+const SPECIAL_PILLS = [
+    { key: "top", label: "TOP", icon: "🏆", cls: "pill-top" },
+    { key: "precio_calidad", label: "★ Calidad/Precio", icon: "⭐", cls: "pill-star" },
+    { key: "eco", label: "ECO", icon: "🌱", cls: "pill-eco" },
+    { key: "veg", label: "VEG", icon: "🥬", cls: "pill-veg" },
+    { key: "bio", label: "BIO", icon: "🌾", cls: "pill-bio" },
 ];
 
 export default function Catalog() {
     const [filters, setFilters] = useState(null);
     const [q, setQ] = useState("");
     const [selectedCats, setSelectedCats] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]); // eco/veg/bio
+    const [topOnly, setTopOnly] = useState(false);
+    const [calidadOnly, setCalidadOnly] = useState(false);
     const [denom, setDenom] = useState("");
     const [zona, setZona] = useState("");
     const [pais, setPais] = useState("");
@@ -68,6 +79,9 @@ export default function Catalog() {
         const params = {
             q: q || undefined,
             categoria: selectedCats.length ? selectedCats.join(",") : undefined,
+            tag: selectedTags.length ? selectedTags.join(",") : undefined,
+            top: topOnly ? true : undefined,
+            precio_calidad: calidadOnly ? true : undefined,
             denominacion: denom || undefined,
             zona: zona || undefined,
             pais: pais || undefined,
@@ -82,7 +96,7 @@ export default function Catalog() {
         api.get("/products", { params })
             .then((r) => setData(r.data))
             .finally(() => setLoading(false));
-    }, [q, selectedCats, denom, zona, pais, bodega, variedad, minPrice, maxPrice, sort, page, perPage]);
+    }, [q, selectedCats, selectedTags, topOnly, calidadOnly, denom, zona, pais, bodega, variedad, minPrice, maxPrice, sort, page, perPage]);
 
     useEffect(() => {
         // debounce search
@@ -98,9 +112,25 @@ export default function Catalog() {
         );
     };
 
+    const toggleTag = (k) => {
+        setPage(1);
+        if (k === "top") {
+            setTopOnly((v) => !v);
+        } else if (k === "precio_calidad") {
+            setCalidadOnly((v) => !v);
+        } else {
+            setSelectedTags((prev) =>
+                prev.includes(k) ? prev.filter((c) => c !== k) : [...prev, k]
+            );
+        }
+    };
+
     const clearFilters = () => {
         setQ("");
         setSelectedCats([]);
+        setSelectedTags([]);
+        setTopOnly(false);
+        setCalidadOnly(false);
         setDenom("");
         setZona("");
         setPais("");
@@ -116,6 +146,9 @@ export default function Catalog() {
     const activeFiltersCount =
         (q ? 1 : 0) +
         selectedCats.length +
+        selectedTags.length +
+        (topOnly ? 1 : 0) +
+        (calidadOnly ? 1 : 0) +
         (denom ? 1 : 0) +
         (zona ? 1 : 0) +
         (pais ? 1 : 0) +
@@ -338,6 +371,35 @@ export default function Catalog() {
                             </button>
                         ))}
                     </div>
+
+                    {/* SPECIAL PILLS (TOP / precio-calidad / eco / veg / bio) */}
+                    <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">
+                        {SPECIAL_PILLS.map((p) => {
+                            const active =
+                                p.key === "top"
+                                    ? topOnly
+                                    : p.key === "precio_calidad"
+                                    ? calidadOnly
+                                    : selectedTags.includes(p.key);
+                            return (
+                                <button
+                                    key={p.key}
+                                    data-testid={`filter-pill-${p.key}`}
+                                    data-active={active}
+                                    onClick={() => toggleTag(p.key)}
+                                    className={`btn-pill whitespace-nowrap ${p.cls}`}
+                                >
+                                    <span className="text-sm leading-none">{p.icon}</span>
+                                    {p.label}
+                                </button>
+                            );
+                        })}
+                        {(filters?.top_count || filters?.precio_calidad_count) && (
+                            <div className="text-[10px] text-muted-foreground self-center pl-2 whitespace-nowrap">
+                                {filters.top_count} top · {filters.precio_calidad_count} ⭐ · {filters.tags?.reduce((s,t)=>s+t.count,0) || 0} etiquetados
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* RESULTS */}
@@ -456,23 +518,59 @@ function ProductCard({ product, onOpen, onAdd, tarifa }) {
         "PVP 6 (SIN IVA)": "pvp_sin_iva",
     }[tarifa];
     const price = product[priceField] || 0;
+    const ratings = product.ratings || {};
+    const hasHighRating = Object.values(ratings).some((v) => v >= 90);
 
     return (
         <div
             data-testid={`product-card-${product.codigo}`}
-            className="group card-thin p-4 flex flex-col hover:border-primary/60 hover:shadow-lg transition-all cursor-pointer"
+            className={`group card-thin p-4 flex flex-col hover:border-primary/60 hover:shadow-lg transition-all cursor-pointer relative ${
+                product.precio_calidad ? "glow-gold" : ""
+            }`}
             onClick={onOpen}
         >
+            {/* Corner badges (absolute) */}
+            <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
+                {product.top_ventas && (
+                    <span
+                        data-testid={`badge-top-${product.codigo}`}
+                        className="text-[9px] font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-sm"
+                        title={`Top ventas #${product.top_rank || ""}`}
+                    >
+                        🏆 TOP{product.top_rank ? `#${product.top_rank}` : ""}
+                    </span>
+                )}
+                {product.precio_calidad && (
+                    <span
+                        data-testid={`badge-star-${product.codigo}`}
+                        className="text-[9px] font-extrabold tracking-wider px-1.5 py-0.5 rounded-md"
+                        style={{ background: "#d6a33c", color: "#3a2a08" }}
+                        title="Mejor relación precio/calidad"
+                    >
+                        ⭐ CALIDAD/PRECIO
+                    </span>
+                )}
+            </div>
+
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                    <div className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground truncate">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground truncate pl-0">
                         {product.categoria} · {product.volumen || ""}
                     </div>
                     <h3 className="text-[15px] font-semibold leading-tight mt-1 line-clamp-2">
                         {product.nombre}
                     </h3>
                 </div>
-                <CategoryBadge cat={product.categoria} />
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                    <CategoryBadge cat={product.categoria} />
+                    {product.tags && product.tags.length > 0 && (
+                        <div className="flex gap-0.5">
+                            {product.tags.map((t) => (
+                                <TagBadge key={t} tag={t} />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="mt-3 space-y-1 text-[12px] font-data text-muted-foreground">
@@ -495,6 +593,26 @@ function ProductCard({ product, onOpen, onAdd, tarifa }) {
                     </div>
                 )}
             </div>
+
+            {hasHighRating && (
+                <div className="mt-2 flex gap-1 flex-wrap">
+                    {ratings.parker >= 90 && (
+                        <span className="rating-badge" data-testid={`rating-parker-${product.codigo}`}>
+                            Parker <strong>{ratings.parker}</strong>
+                        </span>
+                    )}
+                    {ratings.suckling >= 90 && (
+                        <span className="rating-badge" data-testid={`rating-suckling-${product.codigo}`}>
+                            Suckling <strong>{ratings.suckling}</strong>
+                        </span>
+                    )}
+                    {ratings.penin >= 90 && (
+                        <span className="rating-badge" data-testid={`rating-penin-${product.codigo}`}>
+                            Peñín <strong>{ratings.penin}</strong>
+                        </span>
+                    )}
+                </div>
+            )}
 
             <div className="flex-1" />
 
@@ -520,6 +638,24 @@ function ProductCard({ product, onOpen, onAdd, tarifa }) {
                 </button>
             </div>
         </div>
+    );
+}
+
+function TagBadge({ tag }) {
+    const style = {
+        eco: "bg-green-100 text-green-800 border-green-300",
+        veg: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        bio: "bg-green-800 text-white border-green-900",
+    }[tag] || "bg-muted text-muted-foreground";
+    return (
+        <span
+            className={`text-[8px] font-extrabold tracking-wider uppercase px-1 py-0.5 rounded border ${style}`}
+            title={
+                { eco: "Ecológico", veg: "Vegano", bio: "Biodinámico" }[tag] || tag
+            }
+        >
+            {tag}
+        </span>
     );
 }
 

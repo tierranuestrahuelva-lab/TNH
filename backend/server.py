@@ -37,6 +37,9 @@ DB_NAME = os.environ["DB_NAME"]
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 CATALOG_XLSX = os.environ.get("CATALOG_XLSX", "/app/data/catalog.xlsx")
+VENTAS_XLSX = os.environ.get("VENTAS_XLSX", "/app/data/ventas.xlsx")
+CALIDAD_XLSX = os.environ.get("CALIDAD_XLSX", "/app/data/calidad.xlsx")
+RATINGS_JSON = os.environ.get("RATINGS_JSON", "/app/data/ratings_seed.json")
 JWT_ALG = "HS256"
 JWT_EXP_HOURS = 24 * 30  # 30 días
 
@@ -234,15 +237,96 @@ def split_variedades(s: Optional[str]) -> List[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
-async def load_catalog_if_needed():
+def detect_tags(nombre: str) -> List[str]:
+    """Detect eco / veg / bio / organic tags from product name."""
+    if not nombre:
+        return []
+    n = nombre.lower()
+    tags = []
+    # Look inside parentheses: (Eco/Veg) (Eco/Bio) (Eco) (Veg)
+    tag_section = " ".join(re.findall(r"\(([^)]*)\)", n))
+    # Also direct "organic"
+    text = tag_section + " " + n
+    if re.search(r"\beco\b", text) or "organic" in text or "ecolog" in text:
+        tags.append("eco")
+    if re.search(r"\bveg\b", text) or "vegano" in text:
+        tags.append("veg")
+    if re.search(r"\bbio\b", text) or "biodinam" in text:
+        tags.append("bio")
+    return tags
+
+
+async def load_sales_map() -> Dict[str, Dict[str, Any]]:
+    """Load 'Ventas 2026.xlsx' -> codigo => {rank, unidades, importe}"""
+    out: Dict[str, Dict[str, Any]] = {}
+    if not os.path.exists(VENTAS_XLSX):
+        return out
+    try:
+        df = pd.read_excel(VENTAS_XLSX, sheet_name=0)
+        df.columns = [c.strip() for c in df.columns]
+        # Expect: Artículo, Nombre, Unidades, Importe
+        df = df.sort_values("Unidades", ascending=False).reset_index(drop=True)
+        for i, row in df.iterrows():
+            codigo = str(row.get("Artículo", "")).strip()
+            if not codigo:
+                continue
+            out[codigo] = {
+                "rank": int(i) + 1,
+                "unidades": int(row.get("Unidades", 0) or 0),
+                "importe": float(row.get("Importe", 0) or 0),
+            }
+    except Exception as e:
+        logger.warning(f"Could not load sales: {e}")
+    return out
+
+
+async def load_quality_set() -> set:
+    """Load 'Vinos Precio Calidad.xlsx' -> set of codigos."""
+    out: set = set()
+    if not os.path.exists(CALIDAD_XLSX):
+        return out
+    try:
+        df = pd.read_excel(CALIDAD_XLSX, sheet_name=0)
+        df.columns = [c.strip() for c in df.columns]
+        for _, row in df.iterrows():
+            codigo = str(row.get("CÓDIGO", "")).strip()
+            if codigo:
+                out.add(codigo)
+    except Exception as e:
+        logger.warning(f"Could not load quality set: {e}")
+    return out
+
+
+async def load_ratings_map() -> Dict[str, Dict[str, int]]:
+    """Optional JSON with ratings: {codigo: {parker:92,suckling:93,penin:94}}"""
+    if not os.path.exists(RATINGS_JSON):
+        return {}
+    try:
+        with open(RATINGS_JSON, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+
+async def load_catalog_if_needed(force: bool = False):
     count = await db.products.count_documents({})
-    if count > 0:
-        logger.info(f"Catalog already loaded: {count} products")
+    sales_map = await load_sales_map()
+    quality_set = await load_quality_set()
+    ratings_map = await load_ratings_map()
+
+    meta = await db.meta.find_one({"_id": "catalog_loaded_v2"}, {"_id": 0})
+
+    if count > 0 and meta and not force:
+        # Already enriched (v2 schema with tags/top/precio_calidad)
+        logger.info(f"Catalog already loaded and enriched: {count} products")
         return
+
     if not os.path.exists(CATALOG_XLSX):
         logger.warning(f"No catalog file found at {CATALOG_XLSX}")
         return
-    logger.info(f"Loading catalog from {CATALOG_XLSX}...")
+
+    logger.info(f"Loading catalog from {CATALOG_XLSX} (sales={len(sales_map)}, quality={len(quality_set)}, ratings={len(ratings_map)})...")
     df = pd.read_excel(CATALOG_XLSX, sheet_name=0)
     df.columns = [c.strip() for c in df.columns]
     docs = []
@@ -267,7 +351,19 @@ async def load_catalog_if_needed():
         imagen = safe_str(row.get("IMAGEN"))
         localizacion = safe_str(row.get("LOCALIZACION"))
 
+        tags = detect_tags(nombre)
+        sales = sales_map.get(codigo)
+        is_top = bool(sales)
+        is_quality = codigo in quality_set
+        ratings = ratings_map.get(codigo) or None
+
         search_parts = [nombre, bodega, denominacion, zona, variedades, pais, tipo, codigo, abreviatura]
+        if tags:
+            search_parts.append(" ".join(tags))
+        if is_top:
+            search_parts.append("top ventas top")
+        if is_quality:
+            search_parts.append("precio calidad quality star estrella")
         search_text = normalize(" ".join([p for p in search_parts if p]))
 
         doc = {
@@ -293,10 +389,19 @@ async def load_catalog_if_needed():
             "abreviatura": abreviatura,
             "imagen": imagen,
             "search_text": search_text,
+            "tags": tags,
+            "top_ventas": is_top,
+            "top_rank": sales.get("rank") if sales else None,
+            "top_unidades": sales.get("unidades") if sales else None,
+            "top_importe": sales.get("importe") if sales else None,
+            "precio_calidad": is_quality,
+            "ratings": ratings,
         }
         docs.append(doc)
 
     if docs:
+        # Wipe & reload to ensure fresh schema
+        await db.products.delete_many({})
         await db.products.insert_many(docs)
         await db.products.create_index("codigo", unique=True)
         await db.products.create_index("categoria")
@@ -305,7 +410,15 @@ async def load_catalog_if_needed():
         await db.products.create_index("zona")
         await db.products.create_index("pais")
         await db.products.create_index("search_text")
-        logger.info(f"Loaded {len(docs)} products")
+        await db.products.create_index("tags")
+        await db.products.create_index("top_ventas")
+        await db.products.create_index("precio_calidad")
+        await db.meta.update_one(
+            {"_id": "catalog_loaded_v2"},
+            {"$set": {"_id": "catalog_loaded_v2", "at": datetime.now(timezone.utc).isoformat(), "count": len(docs)}},
+            upsert=True,
+        )
+        logger.info(f"Loaded {len(docs)} products (tags, top_ventas, precio_calidad, ratings)")
 
 
 async def seed_users():
@@ -396,6 +509,20 @@ async def get_filters(user: Dict[str, Any] = Depends(current_user)):
     ).to_list(500)
     out["variedades"] = [{"value": r["_id"], "count": r["count"]} for r in var_rows]
 
+    # tags (eco/veg/bio) counts
+    tag_rows = await db.products.aggregate(
+        [
+            {"$unwind": "$tags"},
+            {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+        ]
+    ).to_list(20)
+    out["tags"] = [{"value": r["_id"], "count": r["count"]} for r in tag_rows]
+
+    # top / precio_calidad counts
+    out["top_count"] = await db.products.count_documents({"top_ventas": True})
+    out["precio_calidad_count"] = await db.products.count_documents({"precio_calidad": True})
+
     # price range
     mn = await db.products.find_one({"pvp_tienda": {"$gt": 0}}, {"pvp_tienda": 1, "_id": 0}, sort=[("pvp_tienda", 1)])
     mx = await db.products.find_one({"pvp_tienda": {"$gt": 0}}, {"pvp_tienda": 1, "_id": 0}, sort=[("pvp_tienda", -1)])
@@ -417,9 +544,12 @@ async def list_products(
     bodega: Optional[str] = None,
     distribuidor: Optional[str] = None,
     variedad: Optional[str] = None,
+    tag: Optional[str] = None,  # eco,veg,bio (comma-separated)
+    top: Optional[bool] = None,
+    precio_calidad: Optional[bool] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
-    sort: str = "nombre",  # nombre | price_asc | price_desc
+    sort: str = "nombre",  # nombre | price_asc | price_desc | top_rank
     page: int = 1,
     per_page: int = 30,
     user: Dict[str, Any] = Depends(current_user),
@@ -446,6 +576,14 @@ async def list_products(
         flt["distribuidor"] = distribuidor
     if variedad:
         flt["variedades_list"] = variedad
+    if tag:
+        tags = [t.strip().lower() for t in tag.split(",") if t.strip()]
+        if tags:
+            flt["tags"] = {"$in": tags}
+    if top is True:
+        flt["top_ventas"] = True
+    if precio_calidad is True:
+        flt["precio_calidad"] = True
     if min_price is not None:
         flt.setdefault("pvp_tienda", {})["$gte"] = min_price
     if max_price is not None:
@@ -456,6 +594,7 @@ async def list_products(
         "price_asc": [("pvp_tienda", 1)],
         "price_desc": [("pvp_tienda", -1)],
         "bodega": [("bodega", 1)],
+        "top_rank": [("top_rank", 1), ("nombre", 1)],
     }
     sort_list = sort_map.get(sort, [("nombre", 1)])
     skip = max(0, (page - 1) * per_page)
@@ -580,9 +719,9 @@ async def get_order(order_id: str, user: Dict[str, Any] = Depends(current_user))
 
 
 # --------------------------------------------------------------------------- #
-# AI Assistant (Claude Sonnet 4.5)
+# AI Assistant (Claude Sonnet 4.5) + Memory + Web Search
 # --------------------------------------------------------------------------- #
-AI_SYSTEM = """Eres "Sumiller IA", el asistente comercial de Tierra Nuestra Huelva (TNH), una distribuidora profesional de vinos y destilados en Huelva, Andalucía.
+AI_SYSTEM = """Eres "Sumiller IA", el asistente comercial de Tierra Nuestra Huelva (TNH), una distribuidora profesional de vinos y destilados en Huelva, Andalucía (tierranuestra.es).
 
 Tu misión: potenciar las ventas del equipo comercial (Fernando, Ernesto y la Tienda).
 
@@ -593,43 +732,122 @@ REGLAS:
 4. Incluye SIEMPRE referencias cruzadas a vinos nuestros (por nombre y bodega).
 5. Sé concreto y accionable: frases cortas, bullets, datos útiles. Evita la paja.
 6. Si no tienes datos suficientes, pídelos al comercial en una sola pregunta.
-7. Cuando propongas alternativas, indica código, nombre, bodega, denominación y precio HORECA.
-8. Nunca inventes vinos: si no está en el contexto, dilo.
+7. Cuando propongas alternativas, indica código, nombre, bodega, denominación y precio HORECA. Prioriza productos TOP VENTAS y de MEJOR RELACIÓN PRECIO/CALIDAD (los marcados con ⭐).
+8. Nunca inventes vinos: si no está en el contexto o no sale claramente de una búsqueda web, dilo.
+9. Si el usuario te cuenta algo que debes recordar (preferencias de un cliente, un truco de venta, un detalle de bodega), acuérdate en esta sesión. Si te dice "recuerda esto" o "guarda", responde confirmando y pide si quieres que se guarde permanentemente.
+10. Puntos Parker, James Suckling o Peñín: úsalos si están disponibles en el contexto del producto o en la búsqueda web (búscalos solo si son relevantes; si no, no inventes).
 """
 
 
+WEB_SEARCH_TRIGGERS = [
+    "internet", "web", "online", "busca", "buscar", "news", "noticia",
+    "parker", "suckling", "peñín", "penin", "wine spectator",
+    "tendencia", "guía", "guia", "reseña", "resena", "review",
+    "mejores vinos", "ranking",
+]
+
+
+def _should_web_search(msg: str) -> bool:
+    m = normalize(msg)
+    return any(kw in m for kw in WEB_SEARCH_TRIGGERS)
+
+
+def _web_search_sync(query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """Synchronous DDG search — safe blocking call on a thread."""
+    try:
+        from ddgs import DDGS
+        with DDGS() as ddgs:
+            rs = list(ddgs.text(query, region="es-es", max_results=max_results))
+            return [
+                {"title": r.get("title", ""), "url": r.get("href", ""), "snippet": r.get("body", "")[:280]}
+                for r in rs
+            ]
+    except Exception as e:
+        logger.warning(f"Web search failed: {e}")
+        return []
+
+
+async def web_search(query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    import asyncio
+    return await asyncio.to_thread(_web_search_sync, query, max_results)
+
+
 async def build_catalog_context(codigos: Optional[List[str]], max_items: int = 25) -> str:
-    """Build a textual snapshot of products to feed the LLM."""
+    """Build a textual snapshot of products to feed the LLM. Highlights TOP + precio_calidad."""
+    pipeline = []
     if codigos:
         cursor = db.products.find({"codigo": {"$in": codigos}}, PROJECTION).limit(max_items)
+        items = await cursor.to_list(max_items)
     else:
-        # sample of bestsellers-ish: just sample across categories
-        cursor = db.products.aggregate([{"$sample": {"size": max_items}}])
-    items = await cursor.to_list(max_items)
+        # Prioritize: Top ventas (10) + precio_calidad (8) + random (7)
+        top_items = await db.products.find({"top_ventas": True}, PROJECTION).sort("top_rank", 1).limit(10).to_list(10)
+        cal_items = await db.products.find({"precio_calidad": True}, PROJECTION).limit(8).to_list(8)
+        rand_items = await db.products.aggregate([{"$sample": {"size": 7}}]).to_list(7)
+        seen = set()
+        items = []
+        for batch in (top_items, cal_items, rand_items):
+            for p in batch:
+                if p["codigo"] not in seen:
+                    seen.add(p["codigo"])
+                    items.append(p)
+        items = items[:max_items]
+
     lines = []
     for p in items:
+        badges = []
+        if p.get("top_ventas"):
+            badges.append(f"🏆TOP#{p.get('top_rank','?')}")
+        if p.get("precio_calidad"):
+            badges.append("⭐PRECIO/CALIDAD")
+        if p.get("tags"):
+            badges.append("/".join(t.upper() for t in p["tags"]))
+        if p.get("ratings"):
+            for k, v in p["ratings"].items():
+                badges.append(f"{k.capitalize()}:{v}")
+        bstr = " ".join(badges)
         lines.append(
             f"- [{p.get('codigo')}] {p.get('nombre')} | Bodega: {p.get('bodega') or '—'} | "
             f"DO: {p.get('denominacion') or '—'} | Zona: {p.get('zona') or '—'} | "
             f"Variedades: {p.get('variedades') or '—'} | Tipo: {p.get('tipo') or '—'} | "
-            f"PVP HORECA: {p.get('pvp_horeca')}€"
+            f"PVP HORECA: {p.get('pvp_horeca')}€ {bstr}"
         )
     return "\n".join(lines)
+
+
+async def load_user_memory(username: str, limit: int = 30) -> List[Dict[str, Any]]:
+    cursor = db.ai_memory.find({"username": username}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(limit)
 
 
 @api.post("/ai/chat")
 async def ai_chat(body: AIMessageIn, user: Dict[str, Any] = Depends(current_user)):
     session_id = body.session_id or str(uuid.uuid4())
 
-    # Build catalog context
+    # 1. Build catalog context
     catalog_ctx = await build_catalog_context(body.context_codigos, max_items=25)
 
-    # Load last turns of conversation history (bounded) and inline them in the system message
-    # Avoids O(N) replay LLM calls and stays within token budget.
+    # 2. Web search if relevant
+    web_block = ""
+    if _should_web_search(body.message):
+        web_results = await web_search(body.message, max_results=5)
+        if web_results:
+            web_block = "\n\n--- RESULTADOS DE BÚSQUEDA WEB ---\n"
+            for i, r in enumerate(web_results, 1):
+                web_block += f"{i}. {r['title']}\n   {r['snippet']}\n   ({r['url']})\n"
+
+    # 3. User memory (long-term facts learned)
+    memory_items = await load_user_memory(user["username"], limit=20)
+    memory_block = ""
+    if memory_items:
+        memory_block = "\n\n--- MEMORIA PERSISTENTE (hechos guardados por el comercial) ---\n"
+        for m in memory_items:
+            memory_block += f"- {m.get('fact')}\n"
+
+    # 4. Short-term session history (last 12 messages, inlined)
     history = await db.ai_messages.find(
         {"session_id": session_id}, {"_id": 0}
     ).sort("created_at", 1).to_list(500)
-    last_turns = history[-12:]  # last 12 messages (~6 turns)
+    last_turns = history[-12:]
     history_block = ""
     if last_turns:
         lines = []
@@ -640,8 +858,10 @@ async def ai_chat(body: AIMessageIn, user: Dict[str, Any] = Depends(current_user
 
     system_with_ctx = (
         AI_SYSTEM
-        + "\n\n--- CONTEXTO DEL CATÁLOGO (muestra de productos de TNH) ---\n"
+        + memory_block
+        + "\n\n--- CONTEXTO DEL CATÁLOGO (destacados de TNH) ---\n"
         + catalog_ctx
+        + web_block
         + history_block
     )
 
@@ -655,7 +875,6 @@ async def ai_chat(body: AIMessageIn, user: Dict[str, Any] = Depends(current_user
         reply = await chat.send_message(UserMessage(text=body.message))
     except Exception as e:
         logger.exception("AI error")
-        # Sanitize error message for client
         detail = str(e)
         if "budget" in detail.lower():
             detail = "El servicio de IA está temporalmente saturado. Reintenta en unos segundos."
@@ -715,6 +934,74 @@ async def ai_sessions(user: Dict[str, Any] = Depends(current_user)):
             {"session_id": r["_id"], "last": r["last"], "preview": (r.get("first_msg") or "")[:80]} for r in rows
         ]
     }
+
+
+# --------------------------------------------------------------------------- #
+# AI Long-term memory (per user)
+# --------------------------------------------------------------------------- #
+class MemoryIn(BaseModel):
+    fact: str
+    tags: Optional[List[str]] = None
+
+
+@api.get("/ai/memory")
+async def list_memory(user: Dict[str, Any] = Depends(current_user)):
+    rows = await db.ai_memory.find({"username": user["username"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return {"items": rows}
+
+
+@api.post("/ai/memory")
+async def add_memory(body: MemoryIn, user: Dict[str, Any] = Depends(current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "username": user["username"],
+        "fact": body.fact.strip(),
+        "tags": body.tags or [],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.ai_memory.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.delete("/ai/memory/{memory_id}")
+async def delete_memory(memory_id: str, user: Dict[str, Any] = Depends(current_user)):
+    res = await db.ai_memory.delete_one({"id": memory_id, "username": user["username"]})
+    return {"deleted": res.deleted_count}
+
+
+# --------------------------------------------------------------------------- #
+# Admin: ratings + catalog reload
+# --------------------------------------------------------------------------- #
+class RatingsIn(BaseModel):
+    codigo: str
+    parker: Optional[int] = None
+    suckling: Optional[int] = None
+    penin: Optional[int] = None
+
+
+@api.post("/products/{codigo}/ratings")
+async def set_ratings(codigo: str, body: RatingsIn, user: Dict[str, Any] = Depends(current_user)):
+    ratings = {}
+    if body.parker is not None:
+        ratings["parker"] = int(body.parker)
+    if body.suckling is not None:
+        ratings["suckling"] = int(body.suckling)
+    if body.penin is not None:
+        ratings["penin"] = int(body.penin)
+    if not ratings:
+        raise HTTPException(status_code=400, detail="No rating value provided")
+    res = await db.products.update_one({"codigo": codigo}, {"$set": {"ratings": ratings}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return {"codigo": codigo, "ratings": ratings}
+
+
+@api.post("/admin/reload-catalog")
+async def admin_reload(user: Dict[str, Any] = Depends(current_user)):
+    await load_catalog_if_needed(force=True)
+    total = await db.products.count_documents({})
+    return {"status": "reloaded", "total": total}
 
 
 # --------------------------------------------------------------------------- #
