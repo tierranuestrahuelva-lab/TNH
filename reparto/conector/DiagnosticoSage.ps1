@@ -25,6 +25,22 @@ foreach ($p in "$env:PUBLIC\Desktop", [Environment]::GetFolderPath('Desktop'), "
 }
 L '--- Unidades de red ---'
 Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object { L "$($_.Name): $($_.DisplayRoot) $($_.Root)" }
+L '--- Carpetas compartidas y NAS ---'
+cmd /c "net use" 2>&1 | ForEach-Object { L $_ }
+cmd /c "net view \\Nas-tn" 2>&1 | ForEach-Object { L $_ }
+L '--- Configuración de Sage (servidor / base de datos) ---'
+$dirs = @()
+foreach ($p in 'C:\Program Files (x86)', 'C:\Program Files', 'C:\', 'D:\', 'C:\ProgramData', "$env:APPDATA", "$env:LOCALAPPDATA") {
+  Get-ChildItem $p -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'Sage|Eurowin' } | ForEach-Object { $dirs += $_.FullName }
+}
+foreach ($d in $dirs) {
+  Get-ChildItem $d -Recurse -Depth 3 -Include *.ini, *.config, *.xml, *.cfg, *.json -ErrorAction SilentlyContinue | Where-Object { $_.Length -lt 200kb } | ForEach-Object {
+    $f = $_.FullName
+    Select-String -Path $f -Pattern 'server|servidor|sql|data source|instanc|database|catalog|ruta|path' -ErrorAction SilentlyContinue | Select-Object -First 15 | ForEach-Object { L "$f : $($_.Line.Trim())" }
+  }
+}
+L '--- Servidores SQL en la red ---'
+try { [System.Data.Sql.SqlDataSourceEnumerator]::Instance.GetDataSources() | ForEach-Object { $n = if ($_.InstanceName) { "$($_.ServerName)\$($_.InstanceName)" } else { $_.ServerName }; L "$n (version $($_.Version))"; $inst += $n } } catch { L "No se pudo buscar en la red: $($_.Exception.Message)" }
 L '--- Bases de datos y tablas de albaranes/clientes ---'
 foreach ($s in ($inst | Select-Object -Unique)) {
   try {
