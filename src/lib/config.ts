@@ -6,6 +6,7 @@ export const CONFIG_BASE: Config = {
   empresa: 'CONSTANTIN BECERRA S.L. · Tierra Nuestra Huelva',
   cif: 'B21295688',
   centros: ['Tienda Huelva', 'Almacén', 'Reparto'],
+  puestos: ['Dirección', 'Encargado/a de tienda', 'Dependiente/a', 'Sumiller', 'Comercial', 'Repartidor/a', 'Mozo/a de almacén', 'Administrativo/a'],
   plantillas: [
     { id: 'manana', nombre: 'Mañana', tramos: [{ i: '10:00', f: '14:00' }], color: '#B771A0' },
     { id: 'tarde', nombre: 'Tarde', tramos: [{ i: '17:30', f: '21:00' }], color: '#830040' },

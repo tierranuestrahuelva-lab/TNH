@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { LogOut, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { KeyRound, LogOut, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { CambiarPin, ClaveEquipo } from './Claves'
 import { sb, useDatos } from '../lib/datos'
 import type { Plantilla, Tramo } from '../lib/types'
 import { COLORES } from '../lib/config'
@@ -9,7 +10,7 @@ import { Boton, Campo, Tarjeta, cx, input } from '../ui'
 
 export default function Ajustes() {
   const { config, guardarConfig, empleados, turnos, fichajes, solicitudes, borrar } = useDatos()
-  const [centro, setCentro] = useState('')
+  const [verPin, setVerPin] = useState(false)
   const [fest, setFest] = useState({ fecha: '', nombre: '' })
   const [anio, setAnio] = useState(new Date().getFullYear())
   const setPl = (pl: Plantilla[]) => guardarConfig({ plantillas: pl })
@@ -85,17 +86,24 @@ export default function Ajustes() {
         </Tarjeta>
 
         <div className="space-y-6">
-          <Tarjeta titulo="Centros de trabajo">
-            <div className="flex flex-wrap gap-2">
-              {config.centros.map((c) => <span key={c} className="flex items-center gap-1 rounded-full bg-vino-50 py-1 pl-3 pr-1 text-sm text-vino-800">{c}<button onClick={() => guardarConfig({ centros: config.centros.filter((x) => x !== c) })} className="rounded-full p-1 hover:bg-vino-100"><Trash2 size={12} /></button></span>)}
-            </div>
-            <div className="mt-3 flex gap-2"><input value={centro} onChange={(e) => setCentro(e.target.value)} placeholder="Ej.: Nave Polígono" className={input} /><Boton disabled={!centro.trim()} onClick={() => { guardarConfig({ centros: [...config.centros, centro.trim()] }); setCentro('') }}><Plus size={16} /></Boton></div>
+          <Tarjeta titulo="Puestos de trabajo">
+            <ListaChips items={config.puestos} onChange={(puestos) => guardarConfig({ puestos })} ejemplo="Ej.: Jefe/a de almacén" />
           </Tarjeta>
-          <Tarjeta titulo="Reglas y seguridad">
+          <Tarjeta titulo="Centros de trabajo">
+            <ListaChips items={config.centros} onChange={(centros) => guardarConfig({ centros })} ejemplo="Ej.: Nave Polígono" />
+          </Tarjeta>
+          <Tarjeta titulo="Contraseñas">
+            <ClaveEquipo />
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-vino-50 pt-4">
+              <p className="text-sm text-zinc-500">PIN para entrar como encargado/a.<br />Cada empleado cambia el suyo desde su menú.</p>
+              <Boton tipo="secundario" onClick={() => setVerPin(true)}><KeyRound size={16} />Cambiar PIN del encargado/a</Boton>
+            </div>
+            {verPin && <CambiarPin onCerrar={() => setVerPin(false)} />}
+          </Tarjeta>
+          <Tarjeta titulo="Reglas y empresa">
             <div className="grid grid-cols-2 gap-4">
               <Campo label="Máx. horas al día"><input type="number" className={input} value={config.max_horas_dia} onChange={(e) => guardarConfig({ max_horas_dia: Number(e.target.value) || 9 })} /></Campo>
               <Campo label="Descanso mínimo (h)"><input type="number" className={input} value={config.descanso_min} onChange={(e) => guardarConfig({ descanso_min: Number(e.target.value) || 12 })} /></Campo>
-              <Campo label="PIN del encargado/a"><input inputMode="numeric" maxLength={6} className={cx(input, 'tabular tracking-[0.3em]')} value={config.pin_encargado} onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length >= 4) guardarConfig({ pin_encargado: v }) }} /></Campo>
               <Campo label="CIF"><input className={input} value={config.cif} onChange={(e) => guardarConfig({ cif: e.target.value })} /></Campo>
             </div>
             <div className="mt-4"><Campo label="Empresa (sale en los impresos)"><input className={input} value={config.empresa} onChange={(e) => guardarConfig({ empresa: e.target.value })} /></Campo></div>
@@ -125,5 +133,18 @@ function Tramos({ tramos, onChange }: { tramos: Tramo[]; onChange: (t: Tramo[]) 
       ))}
       {tramos.length < 3 && <button onClick={() => onChange([...tramos, { i: '17:30', f: '21:00' }])} className="rounded-lg px-2 py-1 text-xs text-vino-700 hover:bg-vino-50">+ tramo</button>}
     </div>
+  )
+}
+
+function ListaChips({ items, onChange, ejemplo }: { items: string[]; onChange: (v: string[]) => void; ejemplo: string }) {
+  const [nuevo, setNuevo] = useState('')
+  const añadir = () => { const v = nuevo.trim(); if (v && !items.includes(v)) onChange([...items, v]); setNuevo('') }
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {items.map((c) => <span key={c} className="flex items-center gap-1 rounded-full bg-vino-50 py-1 pl-3 pr-1 text-sm text-vino-800">{c}<button onClick={() => onChange(items.filter((x) => x !== c))} className="rounded-full p-1 hover:bg-vino-100" aria-label={'Quitar ' + c}><Trash2 size={12} /></button></span>)}
+      </div>
+      <div className="mt-3 flex gap-2"><input value={nuevo} onChange={(e) => setNuevo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && añadir()} placeholder={ejemplo} className={input} /><Boton disabled={!nuevo.trim()} onClick={añadir}><Plus size={16} /></Boton></div>
+    </>
   )
 }

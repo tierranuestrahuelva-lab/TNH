@@ -69,7 +69,7 @@ export default function Equipo() {
 }
 
 function FichaEmpleado({ e, onCerrar, onGuardar }: { e: Empleado; onCerrar: () => void; onGuardar: (e: Empleado) => void }) {
-  const { config, empleados } = useDatos()
+  const { config, empleados, guardarConfig } = useDatos()
   const [f, setF] = useState<Empleado>(e)
   const existe = empleados.some((x) => x.id === e.id)
   const num = (v: string) => (v === '' ? null : Number(v.replace(',', '.')))
@@ -81,7 +81,19 @@ function FichaEmpleado({ e, onCerrar, onGuardar }: { e: Empleado; onCerrar: () =
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo label="Nombre y apellidos"><input autoFocus className={input} value={f.nombre} onChange={(x) => setF({ ...f, nombre: x.target.value })} /></Campo>
-        <Campo label="Puesto"><input className={input} value={f.puesto || ''} onChange={(x) => setF({ ...f, puesto: x.target.value })} list="puestos" /><datalist id="puestos">{['Encargado/a de tienda', 'Dependiente/a', 'Sumiller', 'Mozo/a de almacén', 'Repartidor/a', 'Administración', 'Comercial'].map((p) => <option key={p} value={p} />)}</datalist></Campo>
+        <Campo label="Puesto">
+          <select className={input} value={f.puesto || ''} onChange={(x) => {
+            if (x.target.value !== '__otro') return setF({ ...f, puesto: x.target.value })
+            const n = prompt('Nombre del nuevo puesto')?.trim()
+            if (!n) return
+            if (!config.puestos.includes(n)) guardarConfig({ puestos: [...config.puestos, n] })
+            setF({ ...f, puesto: n })
+          }}>
+            <option value="">— Sin puesto —</option>
+            {[...config.puestos, ...(f.puesto && !config.puestos.includes(f.puesto) ? [f.puesto] : [])].map((p) => <option key={p} value={p}>{p}</option>)}
+            <option value="__otro">+ Otro puesto…</option>
+          </select>
+        </Campo>
         <Campo label="Centro habitual"><select className={input} value={f.centro || ''} onChange={(x) => setF({ ...f, centro: x.target.value })}>{config.centros.map((c) => <option key={c}>{c}</option>)}</select></Campo>
         <Campo label="Horas de contrato / semana"><input type="number" className={input} value={f.horas_semana} onChange={(x) => setF({ ...f, horas_semana: Number(x.target.value) || 0 })} /></Campo>
         <Campo label="Días de vacaciones al año" ayuda="30 naturales según el Estatuto (o lo que diga el convenio)"><input type="number" className={input} value={f.vacaciones_anuales} onChange={(x) => setF({ ...f, vacaciones_anuales: Number(x.target.value) || 0 })} /></Campo>

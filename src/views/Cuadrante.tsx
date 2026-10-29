@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Copy, Eraser, FileSpreadsheet, MessageCircle, Paintbrush, Printer, Repeat, StickyNote, X } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Copy, Eraser, FileSpreadsheet, MessageCircle, Paintbrush, Printer, Repeat, StickyNote, X } from 'lucide-react'
 import logo from '../assets/logo-white.svg'
 import { turnoId, useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
@@ -10,6 +10,7 @@ import { csv, whatsapp } from '../lib/exportar'
 import { toast } from '../lib/toast'
 import { Avatar, Barra, Boton, Modal, Segmentos, cx } from '../ui'
 import EditorTurno from './EditorTurno'
+import Sabados from './Sabados'
 
 type Pincel = { tipo: TipoTurno; tramos: Tramo[]; nombre: string; color: string } | 'borrar' | null
 
@@ -20,12 +21,14 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
   const [modo, setModo] = useState<'semana' | 'dia'>('semana')
   const [diaSel, setDiaSel] = useState(hoy())
   const [centro, setCentro] = useState('')
+  const [puesto, setPuesto] = useState('')
+  const [sabados, setSabados] = useState(false)
   const [edit, setEdit] = useState<{ emp: Empleado; fecha: string } | null>(null)
   const [pincel, setPincel] = useState<Pincel>(null)
   const [verAvisos, setVerAvisos] = useState(false)
   const [repetir, setRepetir] = useState(false)
   const dias = semana(lunes)
-  const emps = ix.activos.filter((e) => !centro || e.centro === centro || dias.some((d) => ix.turnoDe(e.id, d)?.centro === centro))
+  const emps = ix.activos.filter((e) => (!centro || e.centro === centro || dias.some((d) => ix.turnoDe(e.id, d)?.centro === centro)) && (!puesto || e.puesto === puesto))
 
   const avisos = useMemo(() => emps.flatMap((e) => avisosSemana(e, dias, ix.turnoDe, config, ix.festivoDe)), [emps, dias, ix, config])
   const avisosDe = (id: string) => avisos.filter((a) => a.empleado_id === id)
@@ -99,6 +102,11 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
           </div>
           <input type="date" value={lunes} onChange={(e) => e.target.value && (setLunes(lunesDe(e.target.value)), setDiaSel(e.target.value))} className="rounded-xl border border-vino-100 bg-white px-3 py-2 text-sm text-vino-800" />
           <Segmentos valor={modo} onChange={setModo} opciones={[{ v: 'semana', l: 'Semana' }, { v: 'dia', l: 'Por horas' }]} />
+          {new Set(ix.activos.map((e) => e.puesto).filter(Boolean)).size > 1 && (
+            <select value={puesto} onChange={(e) => setPuesto(e.target.value)} className="rounded-xl border border-vino-100 bg-white px-3 py-2 text-sm text-vino-800">
+              <option value="">Todos los puestos</option>{[...new Set(ix.activos.map((e) => e.puesto).filter(Boolean) as string[])].map((p) => <option key={p}>{p}</option>)}
+            </select>
+          )}
           {config.centros.length > 1 && (
             <select value={centro} onChange={(e) => setCentro(e.target.value)} className="rounded-xl border border-vino-100 bg-white px-3 py-2 text-sm text-vino-800">
               <option value="">Todos los centros</option>{config.centros.map((c) => <option key={c}>{c}</option>)}
@@ -132,6 +140,7 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
           <div className="ml-auto flex flex-wrap gap-1">
             <Accion icono={<Copy size={16} />} t="Copiar semana anterior" onClick={copiarAnterior} />
             <Accion icono={<Repeat size={16} />} t="Repetir en semanas siguientes" onClick={() => setRepetir(true)} />
+            <button onClick={() => setSabados(true)} className="flex items-center gap-1.5 rounded-xl bg-vino-600 px-3 py-2 text-xs font-semibold text-white hover:bg-vino-700"><CalendarClock size={15} />Sábados alternos</button>
             <Accion icono={<Eraser size={16} />} t="Vaciar semana" onClick={vaciar} />
             <Accion icono={<MessageCircle size={16} />} t="Enviar por WhatsApp" onClick={() => whatsapp(textoWhats())} />
             <Accion icono={<FileSpreadsheet size={16} />} t="Descargar Excel (CSV)" onClick={exportar} />
@@ -236,6 +245,8 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
           })}
         </ul>
       </Modal>
+
+      {sabados && <Sabados lunes={lunes} onCerrar={() => setSabados(false)} />}
 
       <Modal abierto={repetir} onCerrar={() => setRepetir(false)} titulo="Repetir esta semana">
         <p className="mb-4 text-sm text-zinc-600">Copia el cuadrante de esta semana en las semanas siguientes (sustituye lo que haya esos días).</p>

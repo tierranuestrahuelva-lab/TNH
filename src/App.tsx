@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CalendarDays, CalendarRange, Clock, Cloud, CloudOff, LayoutDashboard, LogOut, Palmtree, RefreshCw, Settings, Users, Timer, UserRound, Inbox, BarChart3, ChevronDown } from 'lucide-react'
+import { CalendarDays, CalendarRange, Clock, Cloud, CloudOff, LayoutDashboard, LogOut, Palmtree, RefreshCw, Settings, Users, Timer, UserRound, Inbox, BarChart3, ChevronDown, KeyRound } from 'lucide-react'
 import logo from './assets/logo-white.svg'
 import { DatosProvider, MODO_NUBE, sb, useDatos } from './lib/datos'
 import type { Perfil } from './lib/types'
@@ -17,6 +17,7 @@ import Fichar from './views/Fichar'
 import MiHorario from './views/MiHorario'
 import Solicitudes from './views/Solicitudes'
 import Informes from './views/Informes'
+import { CambiarPin } from './views/Claves'
 
 const K_PERFIL = 'tn-hor-perfil'
 
@@ -45,6 +46,7 @@ function Interior() {
   const setPerfil = (p: Perfil | null) => { setPerfilS(p); p ? localStorage.setItem(K_PERFIL, JSON.stringify(p)) : localStorage.removeItem(K_PERFIL) }
   const [vista, setVista] = useState(() => location.hash.slice(1) || 'hoy')
   const [menu, setMenu] = useState(false)
+  const [pin, setPin] = useState(false)
   useEffect(() => { history.replaceState(null, '', '#' + vista); window.scrollTo(0, 0) }, [vista])
 
   if (d.cargando && !d.empleados.length) return <Cargando />
@@ -88,7 +90,7 @@ function Interior() {
           ))}
         </nav>
         <div className="m-3 rounded-2xl bg-vino-700/60 p-3">
-          <PerfilChip perfil={perfil} onSalir={() => setPerfil(null)} oscuro />
+          <PerfilChip perfil={perfil} onSalir={() => setPerfil(null)} onPin={() => setPin(true)} oscuro />
           <EstadoSync />
         </div>
       </aside>
@@ -104,6 +106,7 @@ function Interior() {
             {perfil.rol === 'encargado' && vistas.filter((v) => !movil.includes(v)).map((v) => (
               <button key={v.id} onClick={() => setVista(v.id)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-vino-50">{v.icono}{v.label}</button>
             ))}
+            <button onClick={() => setPin(true)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-vino-50"><KeyRound size={20} />Cambiar mi PIN</button>
             <button onClick={() => setPerfil(null)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-vino-700 hover:bg-vino-50"><LogOut size={20} />Cambiar de usuario</button>
             <div className="px-3 pt-1"><EstadoSync claro /></div>
           </div>
@@ -111,6 +114,8 @@ function Interior() {
       </header>
 
       <main className="mx-auto max-w-[1400px] px-3 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8" key={actual.id}>{actual.el}</main>
+
+      {pin && <CambiarPin emp={emp} onCerrar={() => setPin(false)} />}
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex border-t border-vino-100 bg-white/95 backdrop-blur lg:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {movil.map((v) => (
@@ -124,7 +129,7 @@ function Interior() {
   )
 }
 
-function PerfilChip({ perfil, onSalir, oscuro }: { perfil: Perfil; onSalir: () => void; oscuro?: boolean }) {
+function PerfilChip({ perfil, onSalir, onPin, oscuro }: { perfil: Perfil; onSalir: () => void; onPin: () => void; oscuro?: boolean }) {
   const { empleados } = useDatos()
   const emp = perfil.rol === 'empleado' ? empleados.find((e) => e.id === perfil.id) : undefined
   return (
@@ -134,6 +139,7 @@ function PerfilChip({ perfil, onSalir, oscuro }: { perfil: Perfil; onSalir: () =
         <p className="truncate text-sm font-semibold">{emp ? emp.nombre : 'Encargado/a'}</p>
         <p className={cx('truncate text-xs', oscuro ? 'text-lila-200' : 'text-zinc-500')}>{emp ? emp.puesto || 'Equipo' : 'Gestión de horarios'}</p>
       </div>
+      <button onClick={onPin} title="Cambiar mi PIN" className="rounded-lg p-2 hover:bg-white/10"><KeyRound size={18} /></button>
       <button onClick={onSalir} title="Cambiar de usuario" className="rounded-lg p-2 hover:bg-white/10"><LogOut size={18} /></button>
     </div>
   )

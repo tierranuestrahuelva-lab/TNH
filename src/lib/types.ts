@@ -53,8 +53,19 @@ export interface Solicitud {
 
 export interface Plantilla { id: string; nombre: string; tramos: Tramo[]; color: string }
 export interface Festivo { fecha: string; nombre: string }
+export interface RuedaSabados {
+  ids: string[]
+  porSabado: number
+  tramos: Tramo[]
+  inicio: string
+  primero: number
+  compDia: number
+  compModo: 'manana' | 'tarde' | 'dia' | 'nada'
+}
 export interface Config {
   centros: string[]
+  puestos: string[]
+  sabados?: RuedaSabados | null
   plantillas: Plantilla[]
   apertura: Record<number, Tramo[]> // 0 = lunes … 6 = domingo
   festivos: Festivo[]
