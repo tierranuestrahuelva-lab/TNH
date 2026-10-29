@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { -webkit-tap-highlight-color: transparent; }
+body { @apply text-zinc-800 antialiased; font-family: 'Fira Sans', system-ui, sans-serif; }
+.font-cond { font-family: 'Fira Sans Condensed', 'Fira Sans', sans-serif; }
+.tabular { font-variant-numeric: tabular-nums; }
+@keyframes subir { from { transform: translateY(16px); opacity: 0 } to { transform: none; opacity: 1 } }
+.animate-subir { animation: subir .22s ease-out; }
+@keyframes latido { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+.latido { animation: latido 1.6s ease-in-out infinite; }
+.fondo-marca { background: radial-gradient(1200px 500px at 110% -10%, #B771A033, transparent 60%), radial-gradient(900px 400px at -10% 110%, #83004022, transparent 60%), #faf7f8; }
+.scroll-fino::-webkit-scrollbar { height: 8px; width: 8px } .scroll-fino::-webkit-scrollbar-thumb { background: #ecc0d3; border-radius: 8px }
+.solo-print { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  .solo-print { display: block !important; }
+  .print-plano { box-shadow: none !important; border: none !important; overflow: visible !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
