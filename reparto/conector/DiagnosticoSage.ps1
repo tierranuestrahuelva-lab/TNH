@@ -25,6 +25,21 @@ foreach ($p in "$env:PUBLIC\Desktop", [Environment]::GetFolderPath('Desktop'), "
 }
 L '--- Unidades de red ---'
 Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object { L "$($_.Name): $($_.DisplayRoot) $($_.Root)" }
+L '--- Servidor de Sage (CONFIG.INI del puesto) ---'
+$srvSage = @()
+foreach ($ini in 'C:\Sage50\Sage50Term\CONFIG.INI', 'D:\Sage50\Sage50Term\CONFIG.INI') {
+  if (Test-Path $ini) {
+    $lin = Get-Content $ini
+    for ($i = 0; $i -lt $lin.Count - 1; $i++) { if ($lin[$i] -match '^\[(SERVIDOR|SERVER|EMPRESA|COMUNES)\]') { L "$($lin[$i]) $($lin[$i+1])"; if ($lin[$i+1] -match '^\\\\([^\\]+)\\') { $srvSage += $matches[1] } } }
+  }
+}
+foreach ($h in ($srvSage | Select-Object -Unique)) {
+  foreach ($f in 'cfgclisrv.xml', 'terminal.xml', 'gruposemp.xml') {
+    $x = "\\$h\Sage50Serv\$f"
+    if (Test-Path $x) { L "== $x"; Get-Content $x -TotalCount 60 | ForEach-Object { L ($_ -replace '(?i)(pass\w*|pwd|contrase\w*)\s*[=>"]+[^<"]*', '$1=***') } }
+  }
+  $inst += "$h\SQLSAGE50"; $inst += $h; $inst += "$h\SQLEXPRESS"
+}
 L '--- Carpetas compartidas y NAS ---'
 cmd /c "net use" 2>&1 | ForEach-Object { L $_ }
 cmd /c "net view \\Nas-tn" 2>&1 | ForEach-Object { L $_ }
