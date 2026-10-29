@@ -93,11 +93,15 @@ const Nube = {
       if (U?.rol === 'oficina') {
         const pos = await this.api('reparto_posiciones?select=*')
         S.posiciones = Object.fromEntries(pos.map((p) => [p.repartidor, p]))
-        const sage = await this.api('reparto_estado?select=*&id=eq.sage')
-        if (sage[0]) S.ultimaSage = sage[0].valor
+        const est = await this.api('reparto_estado?select=*&id=in.(sage,clientes)')
+        for (const e of est) { if (e.id === 'sage') S.ultimaSage = e.valor; if (e.id === 'clientes') S.clientes = Object.assign({}, e.valor, S.clientes) }
       }
       this.ok()
     } catch (e) { this.fallo() }
+  },
+  async guardarClientes() {
+    if (!NUBE || !this.token) return
+    try { await this.api('reparto_estado', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ id: 'clientes', valor: S.clientes }]) }) } catch (e) {}
   },
   async posicion(lat, lng) {
     if (!NUBE || !this.token || !U) return
@@ -159,20 +163,23 @@ function gpsAhora() {
 // ---------- geocodificación y rutas ----------
 const GEO = JSON.parse(localStorage.getItem('tn-reparto-geo') || '{}')
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+const ZONA = '&viewbox=-7.6,37.75,-6.2,36.9&bounded=1' // provincia de Huelva
+const sinTipo = (n) => n.replace(/\(.*?\)/g, ' ').replace(/^\s*(restaurante|bar|meson|mesón|supermercados?|chiringuito|delicatessen|distribuciones|hotel|tabanco|bodegon|bodegón|cafeteria|cafetería)\b/gi, ' ').replace(/\s+/g, ' ').trim()
 async function geocodificar(c) {
-  const qs = [dirTxt(c) + ', España', [c.cp, c.poblacion, 'España'].filter(Boolean).join(' ')]
+  const conDir = !!dirTxt(c)
+  const qs = conDir ? [dirTxt(c) + ', España', [c.cp, c.poblacion, 'España'].filter(Boolean).join(' ')] : [c.nombre, sinTipo(c.nombre || '')].filter((q, i, l) => q && q.length > 3 && l.indexOf(q) === i)
   for (const q of qs) {
     if (GEO[q]) return GEO[q]
     try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q=' + encodeURIComponent(q), { headers: { 'Accept-Language': 'es' } })
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es' + (conDir ? '' : ZONA) + '&q=' + encodeURIComponent(q), { headers: { 'Accept-Language': 'es' } })
       const j = await r.json(); await espera(1100)
-      if (j[0]) { GEO[q] = { lat: +j[0].lat, lng: +j[0].lon, aprox: q !== qs[0] }; localStorage.setItem('tn-reparto-geo', JSON.stringify(GEO)); return GEO[q] }
+      if (j[0]) { GEO[q] = { lat: +j[0].lat, lng: +j[0].lon, aprox: !conDir || q !== qs[0] }; localStorage.setItem('tn-reparto-geo', JSON.stringify(GEO)); return GEO[q] }
     } catch (e) { await espera(1100) }
   }
   return null
 }
 async function situarTodos() {
-  const faltan = delDia().filter((a) => !a.cliente.lat && dirTxt(a.cliente))
+  const faltan = delDia().filter((a) => !a.cliente.lat && (dirTxt(a.cliente) || a.cliente.nombre))
   if (!faltan.length) return toast('Todas las direcciones ya están en el mapa.')
   let n = 0
   for (const a of faltan) {
@@ -421,7 +428,7 @@ function vImportar(m) {
   <p class="mut" style="margin-top:12px">Instalación en el ordenador de Sage: descarga el conector, descomprímelo en el escritorio y haz doble clic en <b>Conector Sage - Reparto</b>.</p><a class="btn sec" href="conector-sage-reparto.zip" download>⬇ Descargar Conector Sage</a>
   </div>
   <div class="card"><h2>📊 Desde Excel de Sage</h2><p class="mut">Alternativa: en Sage 50 saca un listado de albaranes de venta (con cliente, dirección, población, teléfono y total) y exporta a Excel. La app reconoce las columnas sola.</p>
-  <button class="btn sec" id="imp-xls">📥 Cargar Excel de albaranes</button></div>
+  <button class="btn sec" id="imp-xls">📥 Cargar Excel de albaranes o de clientes</button></div>
   <div class="card"><h2>🧪 Probar con datos de ejemplo</h2><p class="mut">Carga 8 albaranes ficticios en Huelva para ver cómo funciona todo.</p><button class="btn sec" id="demo">Cargar ejemplo</button></div>
   <div class="card"><h2>📤 Devolver a Sage</h2><p class="mut">La app nunca escribe en Sage. Las entregas y cobros del día se descargan en Excel desde <b>Informe</b> para pasarlos a Sage.</p></div>`
   if ($('#imp-json')) $('#imp-json').onclick = async () => { const f = await leerArchivo('.json,application/json'); if (f) importarJSON(await f.text()) }
@@ -441,27 +448,55 @@ function importarExcel(buf) {
   const wb = XLSX.read(buf, { type: 'array', cellDates: true })
   const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' })
   const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
-  const campos = { numero: ['numero', 'albaran', 'numalbaran', 'documento', 'n', 'num'], fecha: ['fecha', 'fechaalbaran'], codigo: ['cliente', 'codcliente', 'codigocliente', 'codigo'], nombre: ['nombre', 'nombrecliente', 'razonsocial', 'nombrefiscal'], direccion: ['direccion', 'domicilio', 'direccionenvio'], cp: ['cp', 'codpostal', 'codigopostal'], poblacion: ['poblacion', 'localidad', 'ciudad'], telefono: ['telefono', 'telefono1', 'tlf', 'movil'], total: ['total', 'importe', 'totaldoc', 'totalalbaran', 'importetotal'], articulo: ['articulo', 'codarticulo'], descripcion: ['descripcion', 'nombrearticulo', 'definicion'], unidades: ['unidades', 'cantidad', 'uds'], formaPago: ['formapago', 'fpago', 'formadepago'], obs: ['observaciones', 'obs', 'notas'] }
+  const campos = { numero: ['numero', 'albaran', 'numalbaran', 'documento', 'n', 'num'], fecha: ['fecha', 'fechaalbaran'], codigo: ['cliente', 'codcliente', 'codigocliente', 'codigo'], nombre: ['nombre', 'nombrecliente', 'razonsocial', 'nombrefiscal'], direccion: ['direccion', 'domicilio', 'direccionenvio'], cp: ['cp', 'codpostal', 'codigopostal'], poblacion: ['poblacion', 'localidad', 'ciudad'], telefono: ['telefono', 'telefono1', 'tlf', 'movil'], total: ['total', 'importe', 'totaldoc', 'totalalbaran', 'importetotal'], articulo: ['articulo', 'codarticulo'], descripcion: ['descripcion', 'nombrearticulo', 'definicion'], unidades: ['unidades', 'cantidad', 'uds'], formaPago: ['formapago', 'fpago', 'formadepago'], obs: ['observaciones', 'obs', 'notas'], sel: ['checkselec', 'seleccionado', 'sel'], serie: ['serie'] }
   let hi = -1, col = {}
   for (let i = 0; i < Math.min(15, filas.length) && hi < 0; i++) {
     const c = {}; filas[i].forEach((v, j) => { const n = norm(v); for (const k in campos) if (c[k] === undefined && campos[k].includes(n)) c[k] = j })
     if (c.numero !== undefined && (c.nombre !== undefined || c.codigo !== undefined)) { hi = i; col = c }
   }
-  if (hi < 0) return toast('No encuentro las columnas (Número, Cliente/Nombre…). Envíame el Excel y lo adapto.', 6000)
+  if (hi < 0) return importarClientes(filas, norm, campos)
   const val = (f, k) => col[k] === undefined ? '' : f[col[k]]
   const fec = (v) => v instanceof Date ? v.toLocaleDateString('sv-SE') : /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(String(v).trim()) ? (([d, m, y]) => `${y.length === 2 ? '20' + y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`)(String(v).trim().split('/')) : (typeof v === 'number' ? new Date(Math.round((v - 25569) * 864e5)).toLocaleDateString('sv-SE') : hoy())
   const por = new Map()
+  const marcado = (f) => /^(true|verdadero|si|sí|1|x)$/i.test(String(val(f, 'sel')).trim()) || val(f, 'sel') === true
+  const soloMarcados = col.sel !== undefined && filas.slice(hi + 1).some(marcado)
   for (const f of filas.slice(hi + 1)) {
+    if (soloMarcados && !marcado(f)) continue
     const num = String(val(f, 'numero')).trim(); if (!num) continue
     let a = por.get(num)
-    if (!a) { a = { id: 'xls-' + num, numero: num, fecha: fec(val(f, 'fecha')), origen: 'excel', cliente: { codigo: String(val(f, 'codigo')).trim(), nombre: String(val(f, 'nombre') || val(f, 'codigo')).trim(), direccion: String(val(f, 'direccion')).trim(), cp: String(val(f, 'cp')).trim(), poblacion: String(val(f, 'poblacion')).trim(), telefono: String(val(f, 'telefono')).trim() }, total: 0, lineas: [], formaPago: String(val(f, 'formaPago')), obs: String(val(f, 'obs')), estado: 'pendiente', repartidor: '', orden: 0 }; por.set(num, a) }
+    if (!a) { a = { id: 'xls-' + num, numero: num, fecha: soloMarcados ? hoy() : fec(val(f, 'fecha')), fechaAlbaran: fec(val(f, 'fecha')), origen: 'excel', cliente: { codigo: String(val(f, 'codigo')).trim(), nombre: String(val(f, 'nombre') || val(f, 'codigo')).trim(), direccion: String(val(f, 'direccion')).trim(), cp: String(val(f, 'cp')).trim(), poblacion: String(val(f, 'poblacion')).trim(), telefono: String(val(f, 'telefono')).trim() }, total: 0, lineas: [], formaPago: String(val(f, 'formaPago')), obs: String(val(f, 'obs')), estado: 'pendiente', repartidor: '', orden: 0 }; por.set(num, a) }
     const t = parseFloat(String(val(f, 'total')).replace(/\./g, (x, i, s) => (s.includes(',') ? '' : x)).replace(',', '.')) || 0
     if (col.descripcion !== undefined && val(f, 'descripcion')) { a.lineas.push({ codigo: String(val(f, 'articulo')).trim(), nombre: String(val(f, 'descripcion')).trim(), unidades: val(f, 'unidades') }); if (col.articulo !== undefined) a.total += t; else a.total = t } else a.total = t
   }
   const lista = [...por.values()]
+  lista.forEach(completarCliente)
   const r = fusionar(lista, 'sage'); Nube.subir(lista.map((x) => S.albaranes.find((a) => a.id === x.id)))
   V.fecha = lista.map((a) => a.fecha).sort().pop() || hoy()
-  toast(`Excel cargado: ${r.nuevos} albaranes nuevos, ${r.act} actualizados`); V.tab = 'hoy'; render()
+  toast(`Excel cargado: ${r.nuevos} albaranes nuevos, ${r.act} actualizados${soloMarcados ? ' (solo los marcados en Sage)' : ''}`, 6000); V.tab = 'hoy'; render()
+}
+// Listado de clientes de Sage (código, dirección, teléfono…): completa los albaranes que no traen dirección
+function completarCliente(a) {
+  const c = (S.clientes || {})[a.cliente.codigo]; if (!c) return false
+  let cambia = false
+  for (const k of ['direccion', 'cp', 'poblacion', 'telefono']) if (!a.cliente[k] && c[k]) { a.cliente[k] = c[k]; cambia = true }
+  return cambia
+}
+function importarClientes(filas, norm, campos) {
+  let hi = -1, col = {}
+  for (let i = 0; i < Math.min(15, filas.length) && hi < 0; i++) {
+    const c = {}; filas[i].forEach((v, j) => { const n = norm(v); for (const k of ['codigo', 'nombre', 'direccion', 'cp', 'poblacion', 'telefono']) if (c[k] === undefined && campos[k].includes(n)) c[k] = j })
+    if (c.codigo !== undefined && (c.direccion !== undefined || c.poblacion !== undefined)) { hi = i; col = c }
+  }
+  if (hi < 0) return toast('No encuentro las columnas (Número de albarán, o Código y Dirección del cliente). Envíame el Excel y lo adapto.', 6000)
+  S.clientes = S.clientes || {}; let n = 0
+  for (const f of filas.slice(hi + 1)) {
+    const cod = String(f[col.codigo] ?? '').trim(); if (!cod) continue
+    const v = (k) => col[k] === undefined ? '' : String(f[col[k]] ?? '').trim()
+    S.clientes[cod] = { nombre: v('nombre'), direccion: v('direccion'), cp: v('cp'), poblacion: v('poblacion'), telefono: v('telefono') }; n++
+  }
+  const tocados = S.albaranes.filter((a) => { const c = completarCliente(a); if (c) { delete a.cliente.lat; delete a.cliente.lng; a.upd = Date.now() } return c })
+  guardar(); Nube.subir(tocados); Nube.guardarClientes()
+  toast(`Clientes cargados: ${n}. Direcciones añadidas a ${tocados.length} albaranes. Pulsa "Situar en el mapa".`, 7000); render()
 }
 function cargarDemo() {
   const f = hoy(), C = [

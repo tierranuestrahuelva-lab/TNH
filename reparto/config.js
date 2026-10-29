@@ -1,2 +1,2 @@
-// Conexión central (Supabase). Vacío = cada dispositivo guarda sus datos y se comparten por archivo.
-window.TN_CONFIG = { supabaseUrl: '', supabaseKey: '' }
+// Conexión central (Supabase). Clave pública (anon): los datos solo se ven con la contraseña del equipo.
+window.TN_CONFIG = { supabaseUrl: 'https://zxrrwwmxbvdlkalqzzau.supabase.co', supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4cnJ3d214YnZkbGthbHF6emF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzkxODQsImV4cCI6MjEwODg1NTE4NH0.IZltQVDiXx6QAYSwt5Lt6wGA8U0YRNlKvrICaTEUYh0', equipoEmail: 'reparto@tierranuestra.es' }
