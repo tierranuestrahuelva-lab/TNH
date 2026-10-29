@@ -8,13 +8,32 @@ param(
   [string]$Servidor = '',         # vacío = buscar solo la instancia de Sage
   [string]$BaseDatos = '',        # vacío = la base de datos más reciente que tenga albaranes
   [string]$Salida = "$([Environment]::GetFolderPath('Desktop'))\reparto-sage.json",
+  [string]$Usuario = '',          # usuario SQL de solo lectura (si no, el de Windows)
+  [string]$Clave = '',
   [switch]$Explorar               # muestra instancias, bases y columnas (diagnóstico)
 )
+# conector.ini junto al script (opcional): Servidor=..., Usuario=..., Clave=..., BaseDatos=...
+$ini = Join-Path $PSScriptRoot 'conector.ini'
+if (Test-Path $ini) {
+  foreach ($l in Get-Content $ini) {
+    if ($l -match '^\s*(Servidor|Usuario|Clave|BaseDatos)\s*=\s*(.*?)\s*$') {
+      if (-not (Get-Variable $matches[1] -ValueOnly)) { Set-Variable $matches[1] $matches[2] }
+    }
+  }
+}
 $ErrorActionPreference = 'Stop'
 
 function Abrir($srv, $db) {
-  $cs = "Server=$srv;Database=$db;Integrated Security=True;Connect Timeout=8;Application Name=ConectorRepartoTN;ApplicationIntent=ReadOnly"
-  $c = New-Object System.Data.SqlClient.SqlConnection $cs; $c.Open(); $c
+  $aut = if ($Usuario) { "User ID=$Usuario;Password=$Clave" } else { 'Integrated Security=True' }
+  $cs = "Server=$srv;Database=$db;$aut;Connect Timeout=8;Application Name=ConectorRepartoTN;ApplicationIntent=ReadOnly"
+  try { $c = New-Object System.Data.SqlClient.SqlConnection $cs; $c.Open(); return $c }
+  catch {
+    # con el nombre del servidor a veces falla la autenticación de Windows (SSPI); se reintenta por IP
+    if ($srv -notmatch '^([^\\]+)(\\.*)?$' -or $matches[1] -match '^[\d.]+$|^\.$') { throw }
+    $ip = [Net.Dns]::GetHostAddresses($matches[1]) | Where-Object { $_.AddressFamily -eq 'InterNetwork' } | Select-Object -First 1
+    if (-not $ip) { throw }
+    $c = New-Object System.Data.SqlClient.SqlConnection ($cs -replace [regex]::Escape("Server=$srv;"), "Server=$($ip.IPAddressToString)$($matches[2]);"); $c.Open(); return $c
+  }
 }
 function Consulta($con, $sql, $p = @{}) {
   $cmd = $con.CreateCommand(); $cmd.CommandText = $sql; $cmd.CommandTimeout = 60
@@ -25,6 +44,17 @@ function Instancias {
   $l = @()
   foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Microsoft SQL Server\Instance Names\SQL') {
     if (Test-Path $k) { (Get-ItemProperty $k).PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' } | ForEach-Object { $l += $(if ($_.Name -eq 'MSSQLSERVER') { '.' } else { ".\$($_.Name)" }) } }
+  }
+  # servidor de Sage configurado en el puesto (Sage50Term\CONFIG.INI -> Sage50Serv\cfgclisrv.xml)
+  foreach ($d in 'C:\Sage50\Sage50Term', 'D:\Sage50\Sage50Term') {
+    $f = Join-Path $d 'CONFIG.INI'
+    if (Test-Path $f) {
+      $t = Get-Content $f; $i = [array]::IndexOf($t, '[SERVIDOR]')
+      if ($i -ge 0) {
+        $x = Join-Path $t[$i + 1] 'cfgclisrv.xml'
+        if (Test-Path $x) { $ipSage = ([xml](Get-Content $x -Raw)).VFPData.cfgclisrv.ip; if ($ipSage) { $l += $ipSage } }
+      }
+    }
   }
   $l | Sort-Object { if ($_ -match 'SAGE') { 0 } else { 1 } } -Unique
 }
@@ -37,7 +67,7 @@ function Elegir($cols, [string[]]$candidatas) { foreach ($c in $candidatas) { if
 # 1) localizar servidor y base de datos de Sage con albaranes de venta
 $destinos = @()
 $servs = if ($Servidor) { @($Servidor) } else { @(Instancias) }
-if (-not $servs) { throw 'No encuentro SQL Server en este ordenador. Ejecuta el conector en el ordenador donde está la base de datos de Sage 50.' }
+if (-not $servs) { throw 'No encuentro el SQL Server de Sage 50. Indica el servidor en conector.ini (Servidor=SRVHP\SQLSAGE50).' }
 foreach ($s in $servs) {
   try {
     $m = Abrir $s 'master'
