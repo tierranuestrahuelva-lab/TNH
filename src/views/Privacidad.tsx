@@ -4,6 +4,7 @@ import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado } from '../lib/types'
 import { toast } from '../lib/toast'
+import { privacidadLeida } from '../lib/config'
 import { Avatar, Boton, Tarjeta } from '../ui'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -11,6 +12,8 @@ const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: 
 export default function Privacidad({ emp }: { emp?: Empleado }) {
   const { config, guardar } = useDatos()
   const ix = useIndices()
+  const gp = config.geo_puestos || [], zp = config.geo_zona_puestos || []
+  const lista = (l: string[]) => l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0]
   const leido = () => { guardar('empleados', { ...emp!, privacidad_at: new Date().toISOString() }); toast('Gracias, queda registrado') }
   return (
     <div className="space-y-5">
@@ -25,7 +28,7 @@ export default function Privacidad({ emp }: { emp?: Empleado }) {
             {ix.activos.map((e) => (
               <li key={e.id} className="flex items-center gap-2 rounded-xl bg-vino-50/50 px-3 py-2 text-sm">
                 <Avatar emp={e} size={28} /><span className="flex-1 truncate">{e.nombre}</span>
-                {e.privacidad_at ? <span className="flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={14} />{fecha(e.privacidad_at)}</span> : <span className="text-xs font-medium text-amber-700">Pendiente</span>}
+                {privacidadLeida(e) ? <span className="flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={14} />{fecha(e.privacidad_at!)}</span> : <span className="text-xs font-medium text-amber-700">{e.privacidad_at ? 'Pendiente (texto nuevo)' : 'Pendiente'}</span>}
               </li>
             ))}
           </ul>
@@ -41,11 +44,12 @@ export default function Privacidad({ emp }: { emp?: Empleado }) {
         <div className="space-y-4 px-6 py-6 text-[14px] leading-relaxed text-zinc-800 [&_h2]:font-cond [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-vino-700">
           <p>En cumplimiento del Reglamento General de Protección de Datos (RGPD, UE 2016/679) y de la Ley Orgánica 3/2018 (LOPDGDD), te informamos de cómo tratamos tus datos en la aplicación de horarios y registro de jornada.</p>
           <section><h2>Responsable</h2><p>{config.empresa}. CIF {config.cif}. {config.domicilio}. Contacto: {config.email_privacidad}.</p></section>
-          <section><h2>Qué datos tratamos</h2><p>Nombre, puesto, centro de trabajo, jornada contratada, teléfono y correo (si los facilitas), los turnos asignados, las horas de entrada, pausa y salida que registras, las correcciones de esos registros y las solicitudes de vacaciones o permisos. En caso de baja solo se anota el periodo, nunca el diagnóstico. <b>La aplicación no usa tu ubicación, ni la cámara, ni datos biométricos.</b></p></section>
+          <section><h2>Qué datos tratamos</h2><p>Nombre, puesto, centro de trabajo, jornada contratada, teléfono y correo (si los facilitas), los turnos asignados, las horas de entrada, pausa y salida que registras, las correcciones de esos registros y las solicitudes de vacaciones o permisos. En caso de baja solo se anota el periodo, nunca el diagnóstico. {gp.length ? <b>La aplicación no usa la cámara ni datos biométricos. Solo en los puestos indicados más abajo guarda la ubicación del móvil en el momento de fichar.</b> : <b>La aplicación no usa tu ubicación, ni la cámara, ni datos biométricos.</b>}</p></section>
           <section><h2>Para qué y con qué base legal</h2><p>Para cumplir la obligación legal de registrar la jornada diaria (art. 34.9 del Estatuto de los Trabajadores) y para organizar los horarios, descansos, vacaciones y permisos derivados de tu contrato de trabajo (art. 6.1.b y 6.1.c del RGPD). No se usan para otros fines.</p></section>
           <section><h2>Cuánto tiempo</h2><p>Los registros de jornada se conservan <b>cuatro años</b>, como exige la ley. El resto de datos se conservan mientras dure la relación laboral y, después, durante los plazos legales de prescripción.</p></section>
           <section><h2>Quién puede verlos</h2><p>La dirección y los encargados de la empresa; tú mismo/a; tus representantes legales y la Inspección de Trabajo cuando lo soliciten; y la asesoría laboral de la empresa. Los datos se alojan en servidores de Supabase situados en la Unión Europea (Irlanda), que actúa como encargado del tratamiento. No se ceden a terceros salvo obligación legal.</p></section>
           <section><h2>Cómo funciona el registro</h2><p>Cada fichaje guarda la hora y la hora en que llegó al servidor. Si un fichaje se corrige, se conserva la hora original, el motivo y la fecha de la corrección. Los fichajes no se borran: si hay un error, se anulan dejando constancia. Puedes consultar en cualquier momento tu propio registro en la app («Mi registro») e imprimirlo.</p></section>
+          {gp.length > 0 && <section><h2>Ubicación al fichar</h2><p>En los puestos de <b>{lista(gp)}</b>, que trabajan fuera de la tienda, al pulsar «Fichar» el móvil envía la ubicación de ese momento, una sola vez. <b>No se sigue tu recorrido</b> ni se consulta la ubicación en ningún otro momento, tampoco fuera de tu jornada. Sirve para comprobar que la entrada y la salida se registran en el lugar de trabajo.{zp.length > 0 && <> En el puesto de {lista(zp)}, si la entrada o la salida se fichan fuera de los sitios de trabajo de la empresa, el fichaje queda marcado como «fuera de zona» para que lo revise el encargado/a.</>} Si el móvil no da la ubicación, puedes fichar igual y queda anotado «sin ubicación». Base legal: el control del cumplimiento de la jornada laboral por la empresa (art. 20.3 del Estatuto de los Trabajadores y art. 90 de la LOPDGDD). La ubicación se conserva junto al registro de jornada.</p></section>}
           <section><h2>Uso del móvil y desconexión digital</h2><p>Si prefieres no usar tu móvil personal, puedes fichar desde el dispositivo de la tienda. La app solo se usa para fichar y consultar tu horario. No tienes que atenderla fuera de tu jornada (art. 88 LOPDGDD).</p></section>
           <section><h2>Tus derechos</h2><p>Puedes pedir el acceso, la rectificación, la supresión, la limitación, la oposición o la portabilidad de tus datos escribiendo a {config.email_privacidad} o en persona en la tienda. Si crees que no se han respetado tus derechos, puedes reclamar ante la Agencia Española de Protección de Datos (www.aepd.es).</p></section>
 
@@ -58,8 +62,8 @@ export default function Privacidad({ emp }: { emp?: Empleado }) {
 
       {emp && (
         <div className="no-print mx-auto flex max-w-3xl justify-center">
-          {emp.privacidad_at
-            ? <p className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={18} />Leído el {fecha(emp.privacidad_at)}</p>
+          {privacidadLeida(emp)
+            ? <p className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={18} />Leído el {fecha(emp.privacidad_at!)}</p>
             : <Boton onClick={leido} className="w-full sm:w-auto"><ShieldCheck size={18} />He leído la información</Boton>}
         </div>
       )}

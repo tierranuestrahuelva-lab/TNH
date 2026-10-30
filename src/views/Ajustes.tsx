@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { DatabaseBackup, FileSpreadsheet, KeyRound, LogOut, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { Crosshair, DatabaseBackup, FileSpreadsheet, KeyRound, LogOut, MapPin, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { mapa, posicion } from '../lib/geo'
 import { copiaCompleta, diasDesdeCopia, excelFichajes } from '../lib/copia'
 import { CambiarPin, ClaveEquipo } from './Claves'
 import { sb, useDatos } from '../lib/datos'
-import type { Plantilla, Tramo } from '../lib/types'
+import type { Lugar, Plantilla, Tramo } from '../lib/types'
 import { COLORES } from '../lib/config'
 import { DIAS, fechaCorta, uid } from '../lib/fechas'
 import { toast } from '../lib/toast'
@@ -112,6 +113,7 @@ export default function Ajustes() {
               <Campo label="Email para protección de datos"><input className={input} value={config.email_privacidad || ''} onChange={(e) => guardarConfig({ email_privacidad: e.target.value })} /></Campo>
             </div>
           </Tarjeta>
+          <UbicacionFichar />
           <Tarjeta titulo="Copia de seguridad">
             <CopiaSeguridad />
           </Tarjeta>
@@ -177,5 +179,56 @@ export function CopiaSeguridad({ compacto }: { compacto?: boolean }) {
         {!compacto && <Boton tipo="secundario" onClick={excel}><FileSpreadsheet size={16} />Excel con todos los fichajes</Boton>}
       </div>
     </div>
+  )
+}
+
+function UbicacionFichar() {
+  const { config, guardarConfig } = useDatos()
+  const gp = config.geo_puestos || [], zp = config.geo_zona_puestos || [], lugares = config.lugares || []
+  const [buscando, setBuscando] = useState<string | null>(null)
+  const conGeo = (p: string, v: boolean) => guardarConfig(v ? { geo_puestos: [...gp, p] } : { geo_puestos: gp.filter((x) => x !== p), geo_zona_puestos: zp.filter((x) => x !== p) })
+  const conZona = (p: string, v: boolean) => guardarConfig(v ? { geo_zona_puestos: [...zp, p], geo_puestos: gp.includes(p) ? gp : [...gp, p] } : { geo_zona_puestos: zp.filter((x) => x !== p) })
+  const setL = (ls: Lugar[]) => guardarConfig({ lugares: ls })
+  const cambiar = (id: string, c: Partial<Lugar>) => setL(lugares.map((l) => (l.id === id ? { ...l, ...c } : l)))
+  const aqui = async (l: Lugar) => {
+    setBuscando(l.id)
+    try { const p = await posicion(); cambiar(l.id, { lat: p.coords.latitude, lon: p.coords.longitude }); toast(`Ubicación de «${l.nombre}» guardada (precisión ${Math.round(p.coords.accuracy)} m)`) }
+    catch { toast('No se pudo obtener la ubicación: da permiso de ubicación al navegador') }
+    setBuscando(null)
+  }
+  const nuevo = () => setL([...lugares, { id: uid(), nombre: 'Nuevo sitio', lat: lugares[0]?.lat ?? 37.25634, lon: lugares[0]?.lon ?? -6.94829, radio: 150 }])
+  return (
+    <Tarjeta titulo="Ubicación al fichar">
+      <p className="text-sm text-zinc-600">Solo se guarda dónde está la persona <b>en el momento de fichar</b>. Nunca se sigue su recorrido durante el día.</p>
+      <div className="mt-3 overflow-hidden rounded-xl border border-vino-100">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 bg-vino-50/60 px-3 py-2 font-cond text-[11px] uppercase tracking-wider text-vino-700"><span>Puesto</span><span className="w-20 text-center">Guardar ubicación</span><span className="w-20 text-center">Avisar fuera de zona</span></div>
+        {config.puestos.map((p) => (
+          <label key={p} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 border-t border-vino-50 px-3 py-1.5 text-sm">
+            <span className="truncate">{p}</span>
+            <span className="w-20 text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={gp.includes(p)} onChange={(e) => conGeo(p, e.target.checked)} /></span>
+            <span className="w-20 text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={zp.includes(p)} onChange={(e) => conZona(p, e.target.checked)} /></span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-zinc-500">«Avisar fuera de zona» marca en naranja la entrada o la salida fichadas lejos de los sitios de trabajo.</p>
+      <p className="mb-2 mt-5 font-cond text-xs uppercase tracking-wider text-vino-800/70">Sitios de trabajo</p>
+      <ul className="space-y-2">
+        {lugares.map((l) => (
+          <li key={l.id} className="rounded-xl bg-vino-50/50 p-3">
+            <div className="flex gap-2">
+              <input value={l.nombre} onChange={(e) => cambiar(l.id, { nombre: e.target.value })} className={input} aria-label="Nombre del sitio" />
+              <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-500">Radio<input type="number" min={50} step={50} value={l.radio} onChange={(e) => cambiar(l.id, { radio: Math.max(50, Number(e.target.value) || 150) })} className={cx(input, 'w-20 tabular')} />m</label>
+              <button onClick={() => confirm(`¿Quitar «${l.nombre}»?`) && setL(lugares.filter((x) => x.id !== l.id))} className="rounded-lg p-2 text-zinc-400 hover:text-red-600" aria-label="Quitar sitio"><Trash2 size={15} /></button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <Boton tipo="secundario" onClick={() => aqui(l)} disabled={buscando === l.id}><Crosshair size={15} />{buscando === l.id ? 'Buscando…' : 'Usar mi ubicación actual'}</Boton>
+              <a href={mapa(l)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-vino-600 hover:underline"><MapPin size={14} />Ver en el mapa</a>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <button onClick={nuevo} className="mt-2 text-sm font-medium text-vino-700 hover:underline">+ Añadir sitio</button>
+      <p className="mt-2 text-xs text-zinc-500">Para fijar un sitio con exactitud, ve allí con el móvil, entra como encargado/a y pulsa «Usar mi ubicación actual».</p>
+    </Tarjeta>
   )
 }

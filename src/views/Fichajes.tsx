@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Ban, ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Printer } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin, Pencil, Plus, Printer } from 'lucide-react'
+import { alertaGeo, mapa, tieneGeo, textoGeo } from '../lib/geo'
 import logo from '../assets/logo-white.svg'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
@@ -31,11 +32,12 @@ export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
   })
   const corr = filas.flatMap((f) => [...f.fs.filter((x) => x.editado), ...f.anul].map((x) => ({ d: f.d, x }))).sort((a, b) => a.x.ts.localeCompare(b.x.ts))
   const textoCorr = (x: Fichaje) => x.anulado ? `${NOM[x.tipo]} ${horaDe(x.ts)} ANULADO (${x.motivo_anulacion || 'sin motivo'})` : `${NOM[x.tipo]} ${x.ts_original ? horaDe(x.ts_original) + '→' : 'añadido '}${horaDe(x.ts)} (${x.nota || 'corregido'})`
+  const geoAl = filas.flatMap((f) => f.fs.filter(alertaGeo).map((x) => ({ d: f.d, x })))
   const totPlan = filas.reduce((s, f) => s + f.plan, 0), totTrab = filas.reduce((s, f) => s + f.trab, 0)
   const exportar = () => csv(`registro-jornada-${emp.nombre.replace(/\s+/g, '-')}-${mes}.csv`, [
     ['Registro de jornada', config.empresa, 'CIF ' + config.cif], ['Trabajador', emp.nombre, emp.puesto || ''], ['Mes', nombreMes(mes)], [],
-    ['Fecha', 'Día', 'Turno previsto', 'Entrada(s)', 'Salida(s)', 'Pausas', 'Horas previstas', 'Horas trabajadas', 'Diferencia', 'Incidencias', 'Correcciones (hora original → final, motivo)'],
-    ...filas.map((f) => [f.d, DIAS_C[diaSemana(f.d)], f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : TIPOS[f.t.tipo].label) : '', f.entradas.map((x) => horaDe(x.ts)).join(' / '), f.salidas.map((x) => horaDe(x.ts)).join(' / '), f.pausaMin ? fmtH(f.pausaMin) : '', f.plan ? fmtH(f.plan) : '', f.trab ? fmtH(f.trab) : '', f.plan || f.trab ? fmtH(f.trab - f.plan) : '', [f.abierto && 'Sin fichar salida', f.fs.some((x) => x.editado) && 'Corregido', f.anul.length && 'Fichaje anulado'].filter(Boolean).join(', '), [...f.fs.filter((x) => x.editado), ...f.anul].map(textoCorr).join(' | ')]),
+    ['Fecha', 'Día', 'Turno previsto', 'Entrada(s)', 'Salida(s)', 'Pausas', 'Horas previstas', 'Horas trabajadas', 'Diferencia', 'Incidencias', 'Correcciones (hora original → final, motivo)', 'Ubicación al fichar'],
+    ...filas.map((f) => [f.d, DIAS_C[diaSemana(f.d)], f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : TIPOS[f.t.tipo].label) : '', f.entradas.map((x) => horaDe(x.ts)).join(' / '), f.salidas.map((x) => horaDe(x.ts)).join(' / '), f.pausaMin ? fmtH(f.pausaMin) : '', f.plan ? fmtH(f.plan) : '', f.trab ? fmtH(f.trab) : '', f.plan || f.trab ? fmtH(f.trab - f.plan) : '', [f.abierto && 'Sin fichar salida', f.fs.some((x) => x.editado) && 'Corregido', f.anul.length && 'Fichaje anulado', f.fs.some((x) => x.fuera_zona) && 'Fuera de zona', f.fs.some((x) => x.geo_error) && 'Sin ubicación'].filter(Boolean).join(', '), [...f.fs.filter((x) => x.editado), ...f.anul].map(textoCorr).join(' | '), f.fs.filter(tieneGeo).map((x) => `${NOM[x.tipo]} ${horaDe(x.ts)}: ${textoGeo(x, config)}${x.lat != null ? ' ' + mapa(x) : ''}`).join(' | ')]),
     [], ['TOTAL', '', '', '', '', '', fmtH(totPlan), fmtH(totTrab), fmtH(totTrab - totPlan)],
   ])
   return (
@@ -79,7 +81,7 @@ export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
                   <td className="px-4 py-2 font-medium tabular"><span className="inline-block w-8 text-zinc-400">{DIAS_C[diaSemana(f.d)]}</span>{deIso(f.d).getDate()}</td>
                   <td className="px-2 text-zinc-600 tabular">{f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : <span style={{ color: TIPOS[f.t.tipo].fg }}>{TIPOS[f.t.tipo].label}</span>) : ix.festivoDe(f.d) ? <span className="text-blue-700">{ix.festivoDe(f.d)}</span> : ''}</td>
                   <td className="px-2">
-                    <div className="flex flex-wrap gap-1">{f.fs.map((x) => <span key={x.id} className={cx('rounded-md px-1.5 py-0.5 text-xs tabular', x.tipo === 'entrada' || x.tipo === 'vuelta' ? 'bg-emerald-50 text-emerald-800' : x.tipo === 'pausa' ? 'bg-amber-50 text-amber-800' : 'bg-vino-50 text-vino-800', x.editado && 'ring-1 ring-zinc-300')} title={[x.ts_original && `Hora original ${horaDe(x.ts_original)}`, x.nota].filter(Boolean).join(' · ')}>{NOM[x.tipo][0]} {horaDe(x.ts)}{x.editado && '*'}</span>)}
+                    <div className="flex flex-wrap gap-1">{f.fs.map((x) => <span key={x.id} className={cx('rounded-md px-1.5 py-0.5 text-xs tabular', x.tipo === 'entrada' || x.tipo === 'vuelta' ? 'bg-emerald-50 text-emerald-800' : x.tipo === 'pausa' ? 'bg-amber-50 text-amber-800' : 'bg-vino-50 text-vino-800', x.editado && 'ring-1 ring-zinc-300', alertaGeo(x) && 'ring-1 ring-amber-400')} title={[x.ts_original && `Hora original ${horaDe(x.ts_original)}`, x.nota, textoGeo(x, config)].filter(Boolean).join(' · ')}>{NOM[x.tipo][0]} {horaDe(x.ts)}{x.editado && '*'}{tieneGeo(x) && <MapPin size={10} className={cx('ml-0.5 inline align-[-1px]', alertaGeo(x) ? 'text-amber-600' : 'opacity-50')} />}</span>)}
                       {f.anul.map((x) => <span key={x.id} className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-400 line-through tabular" title={'Anulado: ' + (x.motivo_anulacion || '')}>{NOM[x.tipo][0]} {horaDe(x.ts)}</span>)}
                       {f.abierto && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">falta salida</span>}
                       {!f.fs.length && f.plan > 0 && f.d < hoy() && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">sin fichar</span>}
@@ -114,7 +116,24 @@ export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
           </table>
         </div>
       )}
-      <p className="no-print text-xs text-zinc-500">* Fichaje corregido manualmente: se guarda la hora original, el motivo y la fecha. Los fichajes no se borran, se anulan dejando constancia. La ley obliga a conservar el registro 4 años y tenerlo a disposición del trabajador y de la Inspección de Trabajo.</p>
+      {geoAl.length > 0 && (
+        <div className="print-plano overflow-x-auto rounded-2xl border border-amber-200 bg-white shadow-suave scroll-fino">
+          <p className="px-4 pt-3 font-cond text-xs uppercase tracking-wider text-amber-800">Fichajes fuera de zona o sin ubicación</p>
+          <table className="w-full min-w-[560px] text-sm">
+            <thead><tr className="text-left font-cond text-[11px] uppercase tracking-wider text-zinc-500"><th className="px-4 py-2">Día</th><th className="px-2">Fichaje</th><th className="px-2">Hora</th><th className="px-2">Ubicación</th><th className="px-2" /></tr></thead>
+            <tbody>{geoAl.map(({ d, x }) => (
+              <tr key={x.id} className="border-t border-amber-50">
+                <td className="px-4 py-1.5 tabular">{deIso(d).getDate()}/{deIso(d).getMonth() + 1}</td>
+                <td className="px-2">{NOM[x.tipo]}</td>
+                <td className="px-2 font-medium tabular">{horaDe(x.ts)}</td>
+                <td className="px-2 text-amber-800">{textoGeo(x, config)}</td>
+                <td className="px-2 text-right">{x.lat != null && <a href={mapa(x)} target="_blank" rel="noreferrer" className="no-print text-vino-600 hover:underline">Ver mapa</a>}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      <p className="no-print text-xs text-zinc-500">* Fichaje corregido manualmente: se guarda la hora original, el motivo y la fecha. Los fichajes no se borran, se anulan dejando constancia. El icono de ubicación indica que se guardó dónde se fichó (naranja: fuera de zona o sin ubicación). La ley obliga a conservar el registro 4 años y tenerlo a disposición del trabajador y de la Inspección de Trabajo.</p>
       <div className="solo-print mt-10 grid grid-cols-2 gap-16 text-sm"><div className="border-t border-zinc-400 pt-2">Firma de la empresa</div><div className="border-t border-zinc-400 pt-2">Firma del trabajador/a</div></div>
       {edit && <EditorFichajes emp={emp} fecha={edit} onCerrar={() => setEdit(null)} />}
     </div>
@@ -122,7 +141,7 @@ export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
 }
 
 function EditorFichajes({ emp, fecha, onCerrar }: { emp: Empleado; fecha: string; onCerrar: () => void }) {
-  const { guardar } = useDatos()
+  const { guardar, config } = useDatos()
   const ix = useIndices()
   const fs = ix.fichajesDe(emp.id, fecha), anul = ix.anuladosDe(emp.id, fecha)
   const [tipo, setTipo] = useState<TipoFichaje>(fs.length && fs[fs.length - 1].tipo !== 'salida' ? 'salida' : 'entrada')
@@ -157,7 +176,8 @@ function EditorFichajes({ emp, fecha, onCerrar }: { emp: Empleado; fecha: string
           <li key={f.id} className="flex items-center gap-2 rounded-xl bg-vino-50/50 p-2">
             <span className="w-16 text-sm font-medium">{NOM[f.tipo]}</span>
             <input type="time" defaultValue={horaDe(f.ts)} onBlur={(e) => e.target.value !== horaDe(f.ts) && cambiarHora(f, e.target.value, e.target)} className={cx(input, 'w-28 tabular')} />
-            <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">{f.editado ? `${f.ts_original ? 'Antes ' + horaDe(f.ts_original) + ' · ' : ''}${f.nota || 'Corregido'}` : 'Fichado por el trabajador'}</span>
+            <span className="min-w-0 flex-1 text-xs text-zinc-500"><span className="block truncate">{f.editado ? `${f.ts_original ? 'Antes ' + horaDe(f.ts_original) + ' · ' : ''}${f.nota || 'Corregido'}` : 'Fichado por el trabajador'}</span>{tieneGeo(f) && <span className={cx('block truncate', alertaGeo(f) && 'font-medium text-amber-700')}>{textoGeo(f, config)}</span>}</span>
+            {f.lat != null && <a href={mapa(f)} target="_blank" rel="noreferrer" title="Ver en el mapa" className={cx('rounded-lg p-2 hover:bg-vino-50', alertaGeo(f) ? 'text-amber-600' : 'text-zinc-400')}><MapPin size={16} /></a>}
             <button onClick={() => anular(f)} title="Anular fichaje" className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600"><Ban size={16} /></button>
           </li>
         ))}

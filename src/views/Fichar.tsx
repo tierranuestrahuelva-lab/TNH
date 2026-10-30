@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { ChevronRight, Coffee, LogIn, LogOut, Play, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Coffee, LogIn, LogOut, MapPin, Play, ShieldCheck } from 'lucide-react'
+import { alertaGeo, tieneGeo, textoGeo, ubicarFichaje, usaGeo, type DatosGeo } from '../lib/geo'
+import { privacidadLeida } from '../lib/config'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, TipoFichaje } from '../lib/types'
@@ -12,7 +14,9 @@ import { useAhora } from './Hoy'
 const NOMBRE: Record<TipoFichaje, string> = { entrada: 'Entrada', pausa: 'Inicio de pausa', vuelta: 'Fin de pausa', salida: 'Salida' }
 
 export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) => void }) {
-  const { guardar } = useDatos()
+  const { guardar, config } = useDatos()
+  const geo = usaGeo(emp, config)
+  const [ubicando, setUbicando] = useState(false)
   const ix = useIndices()
   const ahora = useAhora(1000)
   const [confirmar, setConfirmar] = useState<TipoFichaje | null>(null)
@@ -25,10 +29,13 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
   const trabSem = sem.reduce((s, x) => s + resumenFichajes(ix.fichajesDe(emp.id, x), ahora).min, 0)
   const planSem = sem.reduce((s, x) => s + minTurno(ix.turnoDe(emp.id, x)), 0)
 
-  const fichar = (tipo: TipoFichaje) => {
-    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts: new Date().toISOString(), tipo })
+  const fichar = async (tipo: TipoFichaje) => {
+    const ts = new Date().toISOString()
+    let g: DatosGeo = {}
+    if (geo) { setUbicando(true); g = await ubicarFichaje(emp, config, tipo); setUbicando(false) }
+    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts, tipo, ...g })
     setConfirmar(null)
-    toast(`${NOMBRE[tipo]} registrada a las ${horaDe(new Date().toISOString())}`)
+    toast(`${NOMBRE[tipo]} registrada a las ${horaDe(ts)}${g.fuera_zona ? ' · fuera de zona' : g.geo_error ? ' · sin ubicación' : ''}`)
     navigator.vibrate?.(60)
   }
 
@@ -62,12 +69,13 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
           <p className="text-vino-900">¿Registrar <b>{NOMBRE[confirmar].toLowerCase()}</b> ahora, a las <b className="tabular">{horaDe(new Date(ahora).toISOString())}</b>?</p>
           <div className="mt-3 flex justify-center gap-2">
             <button onClick={() => setConfirmar(null)} className="rounded-xl border border-vino-100 px-5 py-2.5 text-sm font-medium text-vino-700">Cancelar</button>
-            <button onClick={() => fichar(confirmar)} className="rounded-xl bg-vino-600 px-6 py-2.5 text-sm font-semibold text-white">Sí, registrar</button>
+            <button onClick={() => fichar(confirmar)} disabled={ubicando} className="rounded-xl bg-vino-600 px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{ubicando ? 'Obteniendo ubicación…' : 'Sí, registrar'}</button>
           </div>
+          {geo && <p className="mt-3 flex items-center justify-center gap-1 text-xs text-zinc-500"><MapPin size={13} />Se guardará tu ubicación solo en este momento.</p>}
         </div>
       )}
 
-      {!emp.privacidad_at && ir && (
+      {!privacidadLeida(emp) && ir && (
         <button onClick={() => ir('privacidad')} className="flex w-full items-center gap-3 rounded-2xl border border-lila-200 bg-lila-50 p-4 text-left text-sm text-lila-600">
           <ShieldCheck className="shrink-0" /><span className="flex-1"><b>Lee la información sobre tus datos</b> y confirma que la has leído.</span><ChevronRight size={18} />
         </button>
@@ -81,6 +89,7 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
                 <span className={cx('absolute -left-[27px] top-1 h-3 w-3 rounded-full ring-4 ring-white', x.tipo === 'entrada' || x.tipo === 'vuelta' ? 'bg-emerald-500' : x.tipo === 'pausa' ? 'bg-amber-400' : 'bg-vino-600')} />
                 <p className="flex justify-between text-sm"><span className="font-medium">{NOMBRE[x.tipo]}</span><span className="tabular text-zinc-600">{horaDe(x.ts)}</span></p>
                 {x.editado && <p className="text-xs text-zinc-400">Corregido por el encargado{x.nota ? `: ${x.nota}` : ''}</p>}
+                {tieneGeo(x) && <p className={cx('flex items-center gap-1 text-xs', alertaGeo(x) ? 'text-amber-700' : 'text-zinc-400')}><MapPin size={12} />{textoGeo(x, config)}</p>}
               </li>
             ))}
           </ol>
@@ -91,7 +100,7 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         <div className="mb-2 flex justify-between text-sm"><span>Trabajado <b className="tabular">{fmtH(trabSem)}</b></span><span className="text-zinc-500">Previsto {fmtH(planSem)} · Contrato {emp.horas_semana} h</span></div>
         <Barra valor={trabSem} max={Math.max(planSem, 1)} color={emp.color || undefined} />
       </Tarjeta>
-      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si te equivocas, avisa a tu encargado/a para corregirlo.</p>
+      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si te equivocas, avisa a tu encargado/a para corregirlo.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}</p>
     </div>
   )
 }

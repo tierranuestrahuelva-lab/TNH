@@ -7,6 +7,9 @@ export const CONFIG_BASE: Config = {
   cif: 'B21295688',
   domicilio: 'C/ Fernando el Católico, 34 · 21003 Huelva',
   email_privacidad: 'tnh@tierranuestrahuelva.es',
+  lugares: [{ id: 'almacen', nombre: 'Almacén', lat: 37.25634, lon: -6.94829, radio: 150 }],
+  geo_puestos: ['Repartidor/a', 'Comercial'],
+  geo_zona_puestos: ['Repartidor/a'],
   centros: ['Tienda Huelva', 'Almacén', 'Reparto'],
   puestos: ['Dirección', 'Encargado/a de tienda', 'Dependiente/a', 'Sumiller', 'Comercial', 'Repartidor/a', 'Mozo/a de almacén', 'Administrativo/a'],
   plantillas: [
@@ -45,3 +48,7 @@ export const CONFIG_BASE: Config = {
   max_horas_dia: 9,
   descanso_min: 12,
 }
+
+// Fecha de la última versión del texto de protección de datos: hay que volver a confirmarlo si es anterior.
+export const PRIV_ACTUALIZADA = '2026-10-30T12:00:00Z'
+export const privacidadLeida = (e: { privacidad_at?: string | null }) => !!e.privacidad_at && e.privacidad_at >= PRIV_ACTUALIZADA

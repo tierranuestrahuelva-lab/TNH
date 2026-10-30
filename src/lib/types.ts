@@ -42,6 +42,13 @@ export interface Fichaje {
   editado_por?: string | null
   editado_at?: string | null
   registrado_at?: string | null
+  lat?: number | null
+  lon?: number | null
+  precision_m?: number | null
+  lugar?: string | null
+  distancia_m?: number | null
+  fuera_zona?: boolean | null
+  geo_error?: string | null
 }
 
 export interface HistFichaje {
@@ -93,6 +100,10 @@ export interface Config {
   domicilio?: string
   email_privacidad?: string
   ultima_copia?: string | null
+  lugares?: Lugar[]
+  geo_puestos?: string[]
+  geo_zona_puestos?: string[]
 }
+export interface Lugar { id: string; nombre: string; lat: number; lon: number; radio: number }
 
 export type Perfil = { rol: 'encargado' } | { rol: 'empleado'; id: string }

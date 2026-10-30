@@ -1,6 +1,7 @@
 import { sb, traerTodo, type Estado } from './datos'
 import { csv, descargar } from './exportar'
 import type { Empleado, Fichaje } from './types'
+import { mapa, textoGeo } from './geo'
 
 const TABLAS = ['hor_empleados', 'hor_turnos', 'hor_fichajes', 'hor_fichajes_hist', 'hor_solicitudes', 'hor_config']
 const fechaHoy = () => new Date().toISOString().slice(0, 10)
@@ -24,9 +25,9 @@ export async function excelFichajes(local: Estado, empresa: string) {
   fichajes.sort((a, b) => (nom.get(a.empleado_id) || '').localeCompare(nom.get(b.empleado_id) || '') || a.ts.localeCompare(b.ts))
   csv(`registro-jornada-completo-${fechaHoy()}.csv`, [
     ['Registro de jornada completo', empresa, 'Generado ' + fh(new Date().toISOString())], [],
-    ['Trabajador/a', 'Fecha', 'Hora', 'Tipo', 'Estado', 'Hora original (si se corrigió)', 'Motivo / nota', 'Modificado el', 'Recibido en el servidor'],
+    ['Trabajador/a', 'Fecha', 'Hora', 'Tipo', 'Estado', 'Hora original (si se corrigió)', 'Motivo / nota', 'Modificado el', 'Recibido en el servidor', 'Ubicación al fichar', 'Mapa'],
     ...fichajes.map((f) => [nom.get(f.empleado_id) || f.empleado_id, new Date(f.ts).toLocaleDateString('es-ES'), new Date(f.ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), NOM[f.tipo] || f.tipo,
-      f.anulado ? 'ANULADO' : f.editado ? 'Corregido' : 'Original', fh(f.ts_original), f.anulado ? f.motivo_anulacion || '' : f.nota || '', fh(f.editado_at), fh(f.registrado_at)]),
+      f.anulado ? 'ANULADO' : f.editado ? 'Corregido' : 'Original', fh(f.ts_original), f.anulado ? f.motivo_anulacion || '' : f.nota || '', fh(f.editado_at), fh(f.registrado_at), textoGeo(f, local.config), f.lat != null ? mapa(f) : '']),
   ])
 }
 
