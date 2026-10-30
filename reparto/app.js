@@ -260,13 +260,13 @@ function pintarMapa(el, paradas, opts = {}) {
 // ---------- pantallas ----------
 function render(silencioso) {
   if (silencioso && $('#modal:not(.hidden)')) return
-  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes'].includes(V.tab)) return
+  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp'].includes(V.tab)) return
   const app = $('#app')
   if (!U) return pantallaEntrada(app)
   if (NUBE && !Nube.token) return pantallaClave(app)
   if (U.rol === 'repartidor') iniciarGPS()
   const tabs = U.rol === 'oficina'
-    ? [['hoy', 'Albaranes'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
+    ? [['hoy', 'Albaranes'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
     : [['ruta', 'Mi ruta'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
   if (!V.tab || !tabs.some((t) => t[0] === V.tab)) V.tab = tabs[0][0]
   const sc = $('main')?.scrollTop, sy = window.scrollY
@@ -275,7 +275,7 @@ function render(silencioso) {
   $$('[data-tab]').forEach((b) => (b.onclick = () => { V.tab = b.dataset.tab; render(); window.scrollTo(0, 0) }))
   $('#salir').onclick = () => { if (confirm('¿Cambiar de usuario?')) { U = null; localStorage.removeItem('tn-reparto-user'); render() } }
   const main = $('#main')
-  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar })[V.tab](main)
+  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, whatsapp: vWhatsapp, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar })[V.tab](main)
   if (silencioso) window.scrollTo(0, sy)
 }
 
@@ -659,4 +659,90 @@ function vEnviar(m) {
 
 render()
 if (NUBE) Nube.bajar()
+
+// ---------- WhatsApp (chatbot con IA) ----------
+const WA = { pedidos: [], avisos: [], clientes: [], chat: [], filtro: 'confirmado' }
+const ESTADOS_WA = { borrador: 'Sin confirmar', confirmado: 'Confirmado por el cliente', revisado: 'Revisado / pasado a Sage', anulado: 'Anulado' }
+async function waCargar() {
+  const [p, a, c] = await Promise.all([
+    Nube.api('wa_pedidos?select=*&order=creado.desc&limit=200'),
+    Nube.api("wa_ajustes?select=*&id=like.aviso:*"),
+    Nube.api('wa_clientes?select=*&order=nombre.asc')
+  ])
+  WA.pedidos = p || []; WA.avisos = a || []; WA.clientes = c || []
+}
+async function vWhatsapp(main) {
+  if (!NUBE || !Nube.token) { main.innerHTML = '<div class="box">Esta parte necesita la conexión central (Supabase).</div>'; return }
+  main.innerHTML = '<div class="box">Cargando…</div>'
+  try { await waCargar() } catch (e) { main.innerHTML = `<div class="box">No se pudo cargar: ${h(e.message)}</div>`; return }
+  const lista = WA.pedidos.filter((p) => WA.filtro === 'todos' || p.estado === WA.filtro)
+  const n = (e) => WA.pedidos.filter((p) => p.estado === e).length
+  main.innerHTML = `
+  ${WA.avisos.length ? `<div class="box" style="border-left:5px solid #830040"><h2>🔔 Quieren hablar con una persona</h2>${WA.avisos.map((a) => `<div class="row" style="justify-content:space-between;gap:8px;margin:6px 0"><span><b>${h(a.valor.nombre || a.valor.telefono)}</b> · ${h(a.valor.telefono)} · ${h(a.valor.motivo || '')}</span><span><a class="btn sec" href="https://wa.me/${h(a.valor.telefono)}" target="_blank">Abrir WhatsApp</a> <button class="btn sec" data-aviso="${h(a.id)}">Atendido</button></span></div>`).join('')}</div>` : ''}
+  <div class="box"><h2>📲 Pedidos recibidos por WhatsApp</h2>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${[['confirmado', 'Confirmados (' + n('confirmado') + ')'], ['borrador', 'Sin confirmar (' + n('borrador') + ')'], ['revisado', 'Revisados (' + n('revisado') + ')'], ['todos', 'Todos']].map(([k, t]) => `<button class="btn ${WA.filtro === k ? '' : 'sec'}" data-f="${k}">${t}</button>`).join('')}
+      <span class="sp"></span><button class="btn sec" id="wa-xls">⬇ Excel para Sage</button><button class="btn sec" id="wa-rec">↻</button>
+    </div>
+    ${lista.length ? lista.map((p) => `<div class="box" style="margin:8px 0;background:#fafafa">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><b>Pedido ${p.id} · ${h(p.cliente_nombre || 'Cliente sin identificar')} ${p.cliente_codigo ? '(' + h(p.cliente_codigo) + ')' : ''}</b><span>${h(p.telefono)} · ${new Date(p.creado).toLocaleString('es-ES')}</span></div>
+      <div style="margin:4px 0;color:#830040">${ESTADOS_WA[p.estado] || p.estado}</div>
+      <table style="width:100%;border-collapse:collapse">${(p.lineas || []).map((l) => `<tr><td style="width:70px"><b>${h(l.cantidad)}</b> ${h(l.unidad)}</td><td>${h(l.descripcion)}</td><td style="color:#777">${h(l.codigo || 'sin código')}</td></tr>`).join('')}</table>
+      ${p.notas ? `<div>📝 ${h(p.notas)}</div>` : ''}
+      <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sec" data-chat="${h(p.telefono)}">💬 Ver conversación</button>${p.estado !== 'revisado' ? `<button class="btn" data-rev="${p.id}">✔ Revisado / pasado a Sage</button>` : ''}${p.estado !== 'anulado' ? `<button class="btn sec" data-anu="${p.id}">Anular</button>` : ''}</div>
+    </div>`).join('') : '<p>No hay pedidos en esta lista.</p>'}
+  </div>
+  <div class="box"><h2>👥 Teléfonos de clientes</h2><p>Para que el chatbot pueda decirle a un cliente lo que pidió y lo que debe, su teléfono tiene que estar unido a su código de Sage.</p>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><input id="wc-tel" placeholder="Teléfono (34699…)" style="width:150px"><input id="wc-cod" placeholder="Código Sage" style="width:110px"><input id="wc-nom" placeholder="Nombre" style="flex:1;min-width:140px"><button class="btn" id="wc-add">Guardar</button></div>
+    ${WA.clientes.length ? `<table style="width:100%;margin-top:8px">${WA.clientes.map((c) => `<tr><td>${h(c.telefono)}</td><td>${h(c.codigo || '')}</td><td>${h(c.nombre || '')}</td><td><button class="btn sec" data-delc="${h(c.telefono)}">Quitar</button></td></tr>`).join('')}</table>` : ''}
+  </div>
+  <div class="box"><h2>🧪 Probar el chatbot</h2><p>Escribe como si fueras un cliente. También puedes mandar una foto o un audio.</p>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><input id="ws-tel" value="${h(localStorage.getItem('tn-wa-sim') || '34600000000')}" style="width:150px" title="Teléfono del cliente de prueba"><input id="ws-txt" placeholder="Ej.: Hola, mándame 2 cajas de Luis Felipe para el viernes" style="flex:1;min-width:200px"><input type="file" id="ws-file" accept="image/*,audio/*" style="max-width:200px"><button class="btn" id="ws-env">Enviar</button></div>
+    <div id="ws-chat" style="margin-top:8px"></div>
+  </div>`
+  $$('[data-f]').forEach((b) => (b.onclick = () => { WA.filtro = b.dataset.f; vWhatsapp(main) }))
+  $('#wa-rec').onclick = () => vWhatsapp(main)
+  const estado = async (id, e) => { await Nube.api('wa_pedidos?id=eq.' + id, { method: 'PATCH', body: JSON.stringify({ estado: e, upd: new Date().toISOString() }) }); vWhatsapp(main) }
+  $$('[data-rev]').forEach((b) => (b.onclick = () => estado(b.dataset.rev, 'revisado')))
+  $$('[data-anu]').forEach((b) => (b.onclick = () => confirm('¿Anular este pedido?') && estado(b.dataset.anu, 'anulado')))
+  $$('[data-aviso]').forEach((b) => (b.onclick = async () => { await Nube.api('wa_ajustes?id=eq.' + encodeURIComponent(b.dataset.aviso), { method: 'DELETE' }); vWhatsapp(main) }))
+  $$('[data-delc]').forEach((b) => (b.onclick = async () => { await Nube.api('wa_clientes?telefono=eq.' + encodeURIComponent(b.dataset.delc), { method: 'DELETE' }); vWhatsapp(main) }))
+  $$('[data-chat]').forEach((b) => (b.onclick = () => waConversacion(b.dataset.chat)))
+  $('#wc-add').onclick = async () => {
+    const tel = $('#wc-tel').value.replace(/\D/g, ''), cod = $('#wc-cod').value.trim()
+    if (!tel || !cod) return toast('Pon el teléfono y el código de Sage')
+    const t = tel.length === 9 ? '34' + tel : tel
+    const c = (S.clientes || {})[cod]
+    await Nube.api('wa_clientes', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ telefono: t, codigo: cod, nombre: $('#wc-nom').value.trim() || (c && c.nombre) || null, verificado: true }]) })
+    vWhatsapp(main)
+  }
+  $('#wa-xls').onclick = () => {
+    const filas = [['Pedido', 'Fecha', 'Estado', 'Teléfono', 'Código cliente', 'Cliente', 'Código artículo', 'Descripción', 'Cantidad', 'Unidad', 'Notas']]
+    lista.forEach((p) => (p.lineas || []).forEach((l) => filas.push([p.id, new Date(p.creado).toLocaleString('es-ES'), ESTADOS_WA[p.estado] || p.estado, p.telefono, p.cliente_codigo || '', p.cliente_nombre || '', l.codigo || '', l.descripcion, l.cantidad, l.unidad, p.notas || ''])))
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Pedidos WhatsApp')
+    XLSX.writeFile(wb, 'pedidos-whatsapp-' + hoy() + '.xlsx')
+  }
+  const pintar = () => { $('#ws-chat').innerHTML = WA.chat.map((m) => `<div style="margin:4px 0;text-align:${m.yo ? 'right' : 'left'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${m.yo ? '#dcf8c6' : '#f1e6ee'}">${h(m.t)}</span></div>`).join('') }
+  pintar()
+  $('#ws-env').onclick = async () => {
+    const tel = $('#ws-tel').value.replace(/\D/g, ''); localStorage.setItem('tn-wa-sim', tel)
+    const f = $('#ws-file').files[0], texto = $('#ws-txt').value.trim()
+    if (!texto && !f) return
+    const body = { simulador: true, telefono: tel, nombre: 'Prueba oficina', tipo: 'text', texto }
+    if (f) { body.tipo = f.type.startsWith('audio') ? 'audio' : 'image'; body.media = { mime: f.type, base64: await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.readAsDataURL(f) }) } }
+    WA.chat.push({ yo: true, t: texto || (body.tipo === 'audio' ? '🎤 audio' : '📷 foto') }); WA.chat.push({ t: '…' }); pintar()
+    $('#ws-txt').value = ''; $('#ws-file').value = ''
+    try {
+      await Nube.renovar()
+      const r = await fetch(CFG.supabaseUrl + '/functions/v1/whatsapp', { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + Nube.token.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const j = await r.json()
+      WA.chat[WA.chat.length - 1] = { t: j.respuesta || ('⚠ ' + (j.error || 'Error')) }
+    } catch (e) { WA.chat[WA.chat.length - 1] = { t: '⚠ ' + e.message } }
+    pintar()
+  }
+}
+async function waConversacion(tel) {
+  const m = await Nube.api('wa_mensajes?select=*&telefono=eq.' + encodeURIComponent(tel) + '&order=at.asc&limit=200')
+  modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
+}
 })()
