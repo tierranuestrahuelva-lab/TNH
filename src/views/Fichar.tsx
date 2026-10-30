@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Coffee, LogIn, LogOut, Play } from 'lucide-react'
+import { ChevronRight, Coffee, LogIn, LogOut, Play, ShieldCheck } from 'lucide-react'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, TipoFichaje } from '../lib/types'
@@ -11,7 +11,7 @@ import { useAhora } from './Hoy'
 
 const NOMBRE: Record<TipoFichaje, string> = { entrada: 'Entrada', pausa: 'Inicio de pausa', vuelta: 'Fin de pausa', salida: 'Salida' }
 
-export default function Fichar({ emp }: { emp: Empleado }) {
+export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) => void }) {
   const { guardar } = useDatos()
   const ix = useIndices()
   const ahora = useAhora(1000)
@@ -65,6 +65,12 @@ export default function Fichar({ emp }: { emp: Empleado }) {
             <button onClick={() => fichar(confirmar)} className="rounded-xl bg-vino-600 px-6 py-2.5 text-sm font-semibold text-white">Sí, registrar</button>
           </div>
         </div>
+      )}
+
+      {!emp.privacidad_at && ir && (
+        <button onClick={() => ir('privacidad')} className="flex w-full items-center gap-3 rounded-2xl border border-lila-200 bg-lila-50 p-4 text-left text-sm text-lila-600">
+          <ShieldCheck className="shrink-0" /><span className="flex-1"><b>Lee la información sobre tus datos</b> y confirma que la has leído.</span><ChevronRight size={18} />
+        </button>
       )}
 
       <Tarjeta titulo="Fichajes de hoy">

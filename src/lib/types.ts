@@ -15,6 +15,7 @@ export interface Empleado {
   vacaciones_anuales: number
   activo: boolean
   orden: number
+  privacidad_at?: string | null
 }
 
 export interface Turno {
@@ -35,6 +36,21 @@ export interface Fichaje {
   tipo: TipoFichaje
   nota?: string | null
   editado?: boolean
+  ts_original?: string | null
+  anulado?: boolean
+  motivo_anulacion?: string | null
+  editado_por?: string | null
+  editado_at?: string | null
+  registrado_at?: string | null
+}
+
+export interface HistFichaje {
+  hid: number
+  fichaje_id: string
+  accion: 'alta' | 'correccion' | 'anulacion'
+  antes: Fichaje | null
+  despues: Fichaje | null
+  cuando: string
 }
 
 export type TipoSolicitud = 'vacaciones' | 'permiso' | 'cambio' | 'baja' | 'otro'
@@ -74,6 +90,9 @@ export interface Config {
   descanso_min: number
   empresa: string
   cif: string
+  domicilio?: string
+  email_privacidad?: string
+  ultima_copia?: string | null
 }
 
 export type Perfil = { rol: 'encargado' } | { rol: 'empleado'; id: string }

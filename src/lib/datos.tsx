@@ -1,3 +1,4 @@
+import { toast } from './toast'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Config, Empleado, Fichaje, Solicitud, Turno } from './types'
@@ -21,7 +22,7 @@ const K_CACHE = 'tn-hor-cache', K_COLA = 'tn-hor-cola'
 const leer = <X,>(k: string, d: X): X => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d } catch { return d } }
 export const turnoId = (emp: string, fecha: string) => `${emp}_${fecha}`
 
-async function traerTodo(tabla: string, filtro?: (q: any) => any) {
+export async function traerTodo(tabla: string, filtro?: (q: any) => any) {
   const filas: any[] = []
   for (let desde = 0; ; desde += 1000) {
     let q = sb!.from(tabla).select('*').range(desde, desde + 999)
@@ -87,12 +88,17 @@ export function DatosProvider({ children, activo }: { children: ReactNode; activ
       const op = colaRef.current[0]
       const q = op.op === 'up' ? sb.from(T[op.tabla]).upsert(op.fila) : sb.from(T[op.tabla]).delete().in('id', op.ids!)
       const { error } = await q
-      if (error) { console.error(error); setError(true); return }
+      if (error) {
+        console.error(error)
+        if (!error.code || !/^(P0|42|23|22)/.test(error.code)) { setError(true); return }
+        toast('No se ha podido guardar un cambio: ' + error.message)
+        recargar()
+      }
       colaRef.current = colaRef.current.slice(1)
       setCola(colaRef.current)
     }
     setError(false)
-  }, [])
+  }, [recargar])
 
   const encolar = useCallback((op: Op) => {
     colaRef.current = [...colaRef.current, op]

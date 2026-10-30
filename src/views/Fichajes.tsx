@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Printer, Trash2 } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Printer } from 'lucide-react'
 import logo from '../assets/logo-white.svg'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
@@ -8,17 +8,17 @@ import { DIAS_C, deIso, diaSemana, diasMes, fechaLarga, fmtH, horaDe, hoy, mesDe
 import { TIPOS, minTurno, resumenFichajes, textoTramos } from '../lib/reglas'
 import { csv } from '../lib/exportar'
 import { toast } from '../lib/toast'
-import { Avatar, Boton, Modal, Tarjeta, cx, input } from '../ui'
+import { Avatar, Boton, Campo, Modal, Tarjeta, cx, input } from '../ui'
 
 const NOM: Record<TipoFichaje, string> = { entrada: 'Entrada', pausa: 'Pausa', vuelta: 'Vuelta', salida: 'Salida' }
 
-export default function Fichajes() {
+export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
   const { config } = useDatos()
   const ix = useIndices()
   const [mes, setMes] = useState(mesDe(hoy()))
   const [empId, setEmpId] = useState(ix.activos[0]?.id || '')
   const [edit, setEdit] = useState<string | null>(null)
-  const emp = ix.empleado(empId) || ix.activos[0]
+  const emp = soloEmp || ix.empleado(empId) || ix.activos[0]
   if (!emp) return <p className="text-zinc-500">No hay empleados.</p>
   const dias = diasMes(mes)
   const filas = dias.map((d) => {
@@ -26,13 +26,16 @@ export default function Fichajes() {
     const r = resumenFichajes(fs, d === hoy() ? Date.now() : new Date(d + 'T23:59:59').getTime())
     const entradas = fs.filter((f) => f.tipo === 'entrada'), salidas = fs.filter((f) => f.tipo === 'salida')
     const pausaMin = (() => { let m = 0, p: number | null = null; for (const f of fs) { if (f.tipo === 'pausa') p = new Date(f.ts).getTime(); if (f.tipo === 'vuelta' && p) { m += (new Date(f.ts).getTime() - p) / 6e4; p = null } } return m })()
-    return { d, fs, t, plan: minTurno(t), trab: r.min, abierto: r.abierto && d < hoy(), entradas, salidas, pausaMin }
+    const anul = ix.anuladosDe(emp.id, d)
+    return { d, fs, anul, t, plan: minTurno(t), trab: r.min, abierto: r.abierto && d < hoy(), entradas, salidas, pausaMin }
   })
+  const corr = filas.flatMap((f) => [...f.fs.filter((x) => x.editado), ...f.anul].map((x) => ({ d: f.d, x }))).sort((a, b) => a.x.ts.localeCompare(b.x.ts))
+  const textoCorr = (x: Fichaje) => x.anulado ? `${NOM[x.tipo]} ${horaDe(x.ts)} ANULADO (${x.motivo_anulacion || 'sin motivo'})` : `${NOM[x.tipo]} ${x.ts_original ? horaDe(x.ts_original) + '→' : 'añadido '}${horaDe(x.ts)} (${x.nota || 'corregido'})`
   const totPlan = filas.reduce((s, f) => s + f.plan, 0), totTrab = filas.reduce((s, f) => s + f.trab, 0)
   const exportar = () => csv(`registro-jornada-${emp.nombre.replace(/\s+/g, '-')}-${mes}.csv`, [
     ['Registro de jornada', config.empresa, 'CIF ' + config.cif], ['Trabajador', emp.nombre, emp.puesto || ''], ['Mes', nombreMes(mes)], [],
-    ['Fecha', 'Día', 'Turno previsto', 'Entrada(s)', 'Salida(s)', 'Pausas', 'Horas previstas', 'Horas trabajadas', 'Diferencia', 'Incidencias'],
-    ...filas.map((f) => [f.d, DIAS_C[diaSemana(f.d)], f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : TIPOS[f.t.tipo].label) : '', f.entradas.map((x) => horaDe(x.ts)).join(' / '), f.salidas.map((x) => horaDe(x.ts)).join(' / '), f.pausaMin ? fmtH(f.pausaMin) : '', f.plan ? fmtH(f.plan) : '', f.trab ? fmtH(f.trab) : '', f.plan || f.trab ? fmtH(f.trab - f.plan) : '', [f.abierto && 'Sin fichar salida', f.fs.some((x) => x.editado) && 'Corregido'].filter(Boolean).join(', ')]),
+    ['Fecha', 'Día', 'Turno previsto', 'Entrada(s)', 'Salida(s)', 'Pausas', 'Horas previstas', 'Horas trabajadas', 'Diferencia', 'Incidencias', 'Correcciones (hora original → final, motivo)'],
+    ...filas.map((f) => [f.d, DIAS_C[diaSemana(f.d)], f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : TIPOS[f.t.tipo].label) : '', f.entradas.map((x) => horaDe(x.ts)).join(' / '), f.salidas.map((x) => horaDe(x.ts)).join(' / '), f.pausaMin ? fmtH(f.pausaMin) : '', f.plan ? fmtH(f.plan) : '', f.trab ? fmtH(f.trab) : '', f.plan || f.trab ? fmtH(f.trab - f.plan) : '', [f.abierto && 'Sin fichar salida', f.fs.some((x) => x.editado) && 'Corregido', f.anul.length && 'Fichaje anulado'].filter(Boolean).join(', '), [...f.fs.filter((x) => x.editado), ...f.anul].map(textoCorr).join(' | ')]),
     [], ['TOTAL', '', '', '', '', '', fmtH(totPlan), fmtH(totTrab), fmtH(totTrab - totPlan)],
   ])
   return (
@@ -42,7 +45,7 @@ export default function Fichajes() {
         <p className="mt-2 text-sm">Trabajador/a: <b>{emp.nombre}</b> {emp.puesto && `· ${emp.puesto}`} · Jornada contratada {emp.horas_semana} h/semana</p>
       </div>
       <div className="no-print flex flex-wrap items-end justify-between gap-3">
-        <div><p className="font-cond text-xs uppercase tracking-[0.2em] text-lila-500">Registro de jornada</p><h1 className="text-2xl font-semibold capitalize text-vino-900 sm:text-3xl">{nombreMes(mes)}</h1></div>
+        <div><p className="font-cond text-xs uppercase tracking-[0.2em] text-lila-500">Registro de jornada</p><h1 className="text-2xl font-semibold text-vino-900 sm:text-3xl"><span className="capitalize">{nombreMes(mes)}</span>{soloEmp && <span className="block text-sm font-normal text-zinc-500">Tu registro de jornada. Si ves un error, avisa a tu encargado/a.</span>}</h1></div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center rounded-xl border border-vino-100 bg-white">
             <button className="rounded-l-xl p-2.5 text-vino-700 hover:bg-vino-50" onClick={() => setMes(sumarMes(mes, -1))}><ChevronLeft size={18} /></button>
@@ -53,11 +56,11 @@ export default function Fichajes() {
           <Boton tipo="secundario" onClick={() => window.print()}><Printer size={16} />Imprimir para firmar</Boton>
         </div>
       </div>
-      <div className="no-print flex gap-2 overflow-x-auto pb-1 scroll-fino">
+      {!soloEmp && <div className="no-print flex gap-2 overflow-x-auto pb-1 scroll-fino">
         {ix.activos.map((e) => (
           <button key={e.id} onClick={() => setEmpId(e.id)} className={cx('flex shrink-0 items-center gap-2 rounded-full border py-1 pl-1 pr-4 text-sm font-medium transition', e.id === emp.id ? 'border-vino-600 bg-vino-600 text-white' : 'border-vino-100 bg-white text-zinc-700 hover:border-vino-300')}><Avatar emp={e} size={28} />{e.nombre}</button>
         ))}
-      </div>
+      </div>}
       <div className="grid grid-cols-3 gap-3 no-print">
         <Tarjeta className="p-4"><p className="font-cond text-[11px] uppercase tracking-wider text-zinc-500">Previstas</p><p className="text-2xl font-semibold text-vino-900 tabular">{fmtH(totPlan)}</p></Tarjeta>
         <Tarjeta className="p-4"><p className="font-cond text-[11px] uppercase tracking-wider text-zinc-500">Trabajadas</p><p className="text-2xl font-semibold text-vino-900 tabular">{fmtH(totTrab)}</p></Tarjeta>
@@ -76,7 +79,8 @@ export default function Fichajes() {
                   <td className="px-4 py-2 font-medium tabular"><span className="inline-block w-8 text-zinc-400">{DIAS_C[diaSemana(f.d)]}</span>{deIso(f.d).getDate()}</td>
                   <td className="px-2 text-zinc-600 tabular">{f.t ? (f.t.tipo === 'trabajo' ? textoTramos(f.t.tramos) : <span style={{ color: TIPOS[f.t.tipo].fg }}>{TIPOS[f.t.tipo].label}</span>) : ix.festivoDe(f.d) ? <span className="text-blue-700">{ix.festivoDe(f.d)}</span> : ''}</td>
                   <td className="px-2">
-                    <div className="flex flex-wrap gap-1">{f.fs.map((x) => <span key={x.id} className={cx('rounded-md px-1.5 py-0.5 text-xs tabular', x.tipo === 'entrada' || x.tipo === 'vuelta' ? 'bg-emerald-50 text-emerald-800' : x.tipo === 'pausa' ? 'bg-amber-50 text-amber-800' : 'bg-vino-50 text-vino-800', x.editado && 'ring-1 ring-zinc-300')} title={x.nota || ''}>{NOM[x.tipo][0]} {horaDe(x.ts)}{x.editado && '*'}</span>)}
+                    <div className="flex flex-wrap gap-1">{f.fs.map((x) => <span key={x.id} className={cx('rounded-md px-1.5 py-0.5 text-xs tabular', x.tipo === 'entrada' || x.tipo === 'vuelta' ? 'bg-emerald-50 text-emerald-800' : x.tipo === 'pausa' ? 'bg-amber-50 text-amber-800' : 'bg-vino-50 text-vino-800', x.editado && 'ring-1 ring-zinc-300')} title={[x.ts_original && `Hora original ${horaDe(x.ts_original)}`, x.nota].filter(Boolean).join(' · ')}>{NOM[x.tipo][0]} {horaDe(x.ts)}{x.editado && '*'}</span>)}
+                      {f.anul.map((x) => <span key={x.id} className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-400 line-through tabular" title={'Anulado: ' + (x.motivo_anulacion || '')}>{NOM[x.tipo][0]} {horaDe(x.ts)}</span>)}
                       {f.abierto && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">falta salida</span>}
                       {!f.fs.length && f.plan > 0 && f.d < hoy() && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">sin fichar</span>}
                     </div>
@@ -84,7 +88,7 @@ export default function Fichajes() {
                   <td className="px-2 text-right text-zinc-500 tabular">{f.pausaMin ? fmtH(f.pausaMin) : ''}</td>
                   <td className="px-2 text-right font-semibold tabular">{f.trab ? fmtH(f.trab) : ''}</td>
                   <td className={cx('px-2 text-right tabular', f.trab - f.plan > 15 ? 'text-amber-700' : f.trab - f.plan < -15 ? 'text-red-600' : 'text-zinc-400')}>{f.plan || f.trab ? fmtH(f.trab - f.plan) : ''}</td>
-                  <td className="no-print pr-2"><button onClick={() => setEdit(f.d)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-vino-50 hover:text-vino-700" title="Corregir"><Pencil size={15} /></button></td>
+                  <td className="no-print pr-2">{!soloEmp && <button onClick={() => setEdit(f.d)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-vino-50 hover:text-vino-700" title="Corregir"><Pencil size={15} /></button>}</td>
                 </tr>
               )
             })}
@@ -92,7 +96,25 @@ export default function Fichajes() {
           </tbody>
         </table>
       </div>
-      <p className="no-print text-xs text-zinc-500">* Fichaje corregido manualmente (queda marcado con el motivo). La ley obliga a conservar el registro 4 años y tenerlo a disposición del trabajador y de la Inspección de Trabajo.</p>
+      {corr.length > 0 && (
+        <div className="print-plano overflow-x-auto rounded-2xl border border-vino-100/60 bg-white shadow-suave scroll-fino">
+          <p className="px-4 pt-3 font-cond text-xs uppercase tracking-wider text-vino-700">Correcciones y anulaciones del mes</p>
+          <table className="w-full min-w-[640px] text-sm">
+            <thead><tr className="text-left font-cond text-[11px] uppercase tracking-wider text-zinc-500"><th className="px-4 py-2">Día</th><th className="px-2">Fichaje</th><th className="px-2">Hora original</th><th className="px-2">Hora final</th><th className="px-2">Motivo</th><th className="px-2">Modificado el</th></tr></thead>
+            <tbody>{corr.map(({ d, x }) => (
+              <tr key={x.id} className="border-t border-vino-50">
+                <td className="px-4 py-1.5 tabular">{deIso(d).getDate()}/{deIso(d).getMonth() + 1}</td>
+                <td className="px-2">{NOM[x.tipo]}</td>
+                <td className="px-2 tabular text-zinc-500">{x.ts_original ? horaDe(x.ts_original) : x.anulado ? horaDe(x.ts) : 'Añadido'}</td>
+                <td className="px-2 font-medium tabular">{x.anulado ? <span className="text-red-600">Anulado</span> : horaDe(x.ts)}</td>
+                <td className="px-2 text-zinc-600">{x.anulado ? x.motivo_anulacion : x.nota}</td>
+                <td className="px-2 tabular text-zinc-500">{x.editado_at ? new Date(x.editado_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : ''}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      <p className="no-print text-xs text-zinc-500">* Fichaje corregido manualmente: se guarda la hora original, el motivo y la fecha. Los fichajes no se borran, se anulan dejando constancia. La ley obliga a conservar el registro 4 años y tenerlo a disposición del trabajador y de la Inspección de Trabajo.</p>
       <div className="solo-print mt-10 grid grid-cols-2 gap-16 text-sm"><div className="border-t border-zinc-400 pt-2">Firma de la empresa</div><div className="border-t border-zinc-400 pt-2">Firma del trabajador/a</div></div>
       {edit && <EditorFichajes emp={emp} fecha={edit} onCerrar={() => setEdit(null)} />}
     </div>
@@ -100,30 +122,52 @@ export default function Fichajes() {
 }
 
 function EditorFichajes({ emp, fecha, onCerrar }: { emp: Empleado; fecha: string; onCerrar: () => void }) {
-  const { guardar, borrar } = useDatos()
+  const { guardar } = useDatos()
   const ix = useIndices()
-  const fs = ix.fichajesDe(emp.id, fecha)
+  const fs = ix.fichajesDe(emp.id, fecha), anul = ix.anuladosDe(emp.id, fecha)
   const [tipo, setTipo] = useState<TipoFichaje>(fs.length && fs[fs.length - 1].tipo !== 'salida' ? 'salida' : 'entrada')
   const [hora, setHora] = useState('')
   const [nota, setNota] = useState('')
+  const motivo = nota.trim()
   const ts = (h: string) => new Date(`${fecha}T${h}:00`).toISOString()
+  const marca = { editado_por: 'Encargado/a', editado_at: new Date().toISOString() }
+  const sinMotivo = () => { toast('Escribe primero el motivo de la corrección'); return true }
   const anadir = () => {
-    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts: ts(hora), tipo, editado: true, nota: nota || 'Añadido por el encargado' } as Fichaje)
-    setHora(''); toast('Fichaje añadido')
+    if (!motivo && sinMotivo()) return
+    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts: ts(hora), tipo, editado: true, nota: motivo, ...marca } as Fichaje)
+    setHora(''); setNota(''); toast('Fichaje añadido')
   }
-  const cambiarHora = (f: Fichaje, h: string) => h && guardar('fichajes', { ...f, ts: ts(h), editado: true, nota: f.nota || 'Hora corregida por el encargado' })
+  const cambiarHora = (f: Fichaje, h: string, el: HTMLInputElement) => {
+    if (!h) return
+    if (!motivo && sinMotivo()) { el.value = horaDe(f.ts); return }
+    guardar('fichajes', { ...f, ts: ts(h), ts_original: f.ts_original || f.ts, editado: true, nota: motivo, ...marca })
+    setNota(''); toast('Hora corregida. Se guarda también la hora original')
+  }
+  const anular = (f: Fichaje) => {
+    if (!motivo && sinMotivo()) return
+    if (!confirm(`¿Anular la ${NOM[f.tipo].toLowerCase()} de las ${horaDe(f.ts)}? Quedará registrado como anulado y no se puede deshacer.`)) return
+    guardar('fichajes', { ...f, anulado: true, motivo_anulacion: motivo, ...marca })
+    setNota(''); toast('Fichaje anulado')
+  }
   return (
     <Modal abierto onCerrar={onCerrar} titulo={<span className="first-letter:uppercase">{emp.nombre} · {fechaLarga(fecha)}</span>}>
-      <ul className="mb-5 space-y-2">
+      <Campo label="Motivo de la corrección (obligatorio)"><input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej.: olvidó fichar la salida" className={input} autoFocus /></Campo>
+      <ul className="my-5 space-y-2">
         {fs.map((f) => (
           <li key={f.id} className="flex items-center gap-2 rounded-xl bg-vino-50/50 p-2">
-            <span className="w-20 text-sm font-medium">{NOM[f.tipo]}</span>
-            <input type="time" defaultValue={horaDe(f.ts)} onBlur={(e) => e.target.value !== horaDe(f.ts) && cambiarHora(f, e.target.value)} className={cx(input, 'w-32 tabular')} />
-            <span className="flex-1 truncate text-xs text-zinc-500">{f.editado ? f.nota || 'Corregido' : 'Fichado por el trabajador'}</span>
-            <button onClick={() => borrar('fichajes', f.id)} className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={16} /></button>
+            <span className="w-16 text-sm font-medium">{NOM[f.tipo]}</span>
+            <input type="time" defaultValue={horaDe(f.ts)} onBlur={(e) => e.target.value !== horaDe(f.ts) && cambiarHora(f, e.target.value, e.target)} className={cx(input, 'w-28 tabular')} />
+            <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">{f.editado ? `${f.ts_original ? 'Antes ' + horaDe(f.ts_original) + ' · ' : ''}${f.nota || 'Corregido'}` : 'Fichado por el trabajador'}</span>
+            <button onClick={() => anular(f)} title="Anular fichaje" className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600"><Ban size={16} /></button>
           </li>
         ))}
-        {!fs.length && <p className="text-sm text-zinc-500">No hay fichajes este día.</p>}
+        {anul.map((f) => (
+          <li key={f.id} className="flex items-center gap-2 rounded-xl bg-zinc-50 p-2 text-zinc-400">
+            <span className="w-16 text-sm line-through">{NOM[f.tipo]}</span><span className="w-28 px-3 text-sm tabular line-through">{horaDe(f.ts)}</span>
+            <span className="min-w-0 flex-1 truncate text-xs">Anulado: {f.motivo_anulacion}</span>
+          </li>
+        ))}
+        {!fs.length && !anul.length && <p className="text-sm text-zinc-500">No hay fichajes este día.</p>}
       </ul>
       <p className="mb-2 font-cond text-xs uppercase tracking-wider text-vino-800/70">Añadir fichaje olvidado</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -131,7 +175,7 @@ function EditorFichajes({ emp, fecha, onCerrar }: { emp: Empleado; fecha: string
         <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} className={cx(input, 'tabular')} />
         <Boton onClick={anadir} disabled={!hora} className="col-span-2 sm:col-span-1"><Plus size={16} />Añadir</Boton>
       </div>
-      <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Motivo (ej.: olvidó fichar la salida)" className={cx(input, 'mt-2')} />
+      <p className="mt-3 text-xs text-zinc-500">Los fichajes no se borran. Cada cambio guarda la hora original, el motivo y la fecha, y aparece en el registro impreso.</p>
     </Modal>
   )
 }

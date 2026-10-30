@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CalendarDays, CalendarRange, Clock, Cloud, CloudOff, LayoutDashboard, LogOut, Palmtree, RefreshCw, Settings, Users, Timer, UserRound, Inbox, BarChart3, ChevronDown, KeyRound } from 'lucide-react'
+import { CalendarDays, CalendarRange, Clock, Cloud, CloudOff, LayoutDashboard, LogOut, Palmtree, RefreshCw, Settings, Users, Timer, UserRound, Inbox, BarChart3, ChevronDown, KeyRound, ShieldCheck } from 'lucide-react'
 import logo from './assets/logo-white.svg'
 import { DatosProvider, MODO_NUBE, sb, useDatos } from './lib/datos'
 import type { Perfil } from './lib/types'
@@ -18,6 +18,7 @@ import MiHorario from './views/MiHorario'
 import Solicitudes from './views/Solicitudes'
 import Informes from './views/Informes'
 import { CambiarPin } from './views/Claves'
+import Privacidad from './views/Privacidad'
 
 const K_PERFIL = 'tn-hor-perfil'
 
@@ -64,15 +65,18 @@ function Interior() {
         { id: 'informes', label: 'Informes', icono: <BarChart3 size={20} />, el: <Informes /> },
         { id: 'equipo', label: 'Equipo', icono: <Users size={20} />, el: <Equipo /> },
         { id: 'ajustes', label: 'Ajustes', icono: <Settings size={20} />, el: <Ajustes /> },
+        { id: 'privacidad', label: 'Protección de datos', icono: <ShieldCheck size={20} />, el: <Privacidad /> },
       ]
     : [
-        { id: 'fichar', label: 'Fichar', icono: <Clock size={20} />, el: <Fichar emp={emp!} /> },
+        { id: 'fichar', label: 'Fichar', icono: <Clock size={20} />, el: <Fichar emp={emp!} ir={setVista} /> },
         { id: 'mihorario', label: 'Mi horario', icono: <CalendarDays size={20} />, el: <MiHorario emp={emp!} /> },
+        { id: 'miregistro', label: 'Mi registro', icono: <Timer size={20} />, el: <Fichajes soloEmp={emp!} /> },
         { id: 'cuadrante', label: 'Equipo', icono: <CalendarRange size={20} />, el: <Cuadrante editable={false} /> },
         { id: 'solicitudes', label: 'Solicitudes', icono: <Inbox size={20} />, el: <Solicitudes emp={emp!} /> },
+        { id: 'privacidad', label: 'Mis datos', icono: <ShieldCheck size={20} />, el: <Privacidad emp={emp!} /> },
       ]
   const actual = vistas.find((v) => v.id === vista) || vistas[0]
-  const movil = perfil.rol === 'encargado' ? vistas.filter((v) => ['hoy', 'cuadrante', 'fichajes', 'ausencias', 'equipo'].includes(v.id)) : vistas
+  const movil = perfil.rol === 'encargado' ? vistas.filter((v) => ['hoy', 'cuadrante', 'fichajes', 'ausencias', 'equipo'].includes(v.id)) : vistas.filter((v) => v.id !== 'privacidad')
 
   return (
     <div className="fondo-marca min-h-screen lg:pl-64">
@@ -103,7 +107,7 @@ function Interior() {
         </button>
         {menu && (
           <div className="absolute right-3 top-full mt-2 w-60 rounded-2xl bg-white p-2 text-zinc-800 shadow-2xl" onClick={() => setMenu(false)}>
-            {perfil.rol === 'encargado' && vistas.filter((v) => !movil.includes(v)).map((v) => (
+            {vistas.filter((v) => !movil.includes(v)).map((v) => (
               <button key={v.id} onClick={() => setVista(v.id)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-vino-50">{v.icono}{v.label}</button>
             ))}
             <button onClick={() => setPin(true)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-vino-50"><KeyRound size={20} />Cambiar mi PIN</button>

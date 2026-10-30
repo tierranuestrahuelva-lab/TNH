@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { KeyRound, LogOut, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { DatabaseBackup, FileSpreadsheet, KeyRound, LogOut, Plus, Smartphone, Trash2 } from 'lucide-react'
+import { copiaCompleta, diasDesdeCopia, excelFichajes } from '../lib/copia'
 import { CambiarPin, ClaveEquipo } from './Claves'
 import { sb, useDatos } from '../lib/datos'
 import type { Plantilla, Tramo } from '../lib/types'
@@ -20,7 +21,6 @@ export default function Ajustes() {
     if (!confirm('¿Borrar los empleados de ejemplo con todos sus turnos, fichajes y solicitudes?')) return
     const ids = new Set(demo.map((e) => e.id))
     borrar('turnos', turnos.filter((t) => ids.has(t.empleado_id)).map((t) => t.id))
-    borrar('fichajes', fichajes.filter((t) => ids.has(t.empleado_id)).map((t) => t.id))
     borrar('solicitudes', solicitudes.filter((t) => ids.has(t.empleado_id)).map((t) => t.id))
     borrar('empleados', [...ids])
     toast('Datos de ejemplo borrados')
@@ -107,6 +107,13 @@ export default function Ajustes() {
               <Campo label="CIF"><input className={input} value={config.cif} onChange={(e) => guardarConfig({ cif: e.target.value })} /></Campo>
             </div>
             <div className="mt-4"><Campo label="Empresa (sale en los impresos)"><input className={input} value={config.empresa} onChange={(e) => guardarConfig({ empresa: e.target.value })} /></Campo></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Campo label="Domicilio de la empresa"><input className={input} value={config.domicilio || ''} onChange={(e) => guardarConfig({ domicilio: e.target.value })} /></Campo>
+              <Campo label="Email para protección de datos"><input className={input} value={config.email_privacidad || ''} onChange={(e) => guardarConfig({ email_privacidad: e.target.value })} /></Campo>
+            </div>
+          </Tarjeta>
+          <Tarjeta titulo="Copia de seguridad">
+            <CopiaSeguridad />
           </Tarjeta>
           <Tarjeta titulo="Instalar en el móvil">
             <div className="flex gap-3 text-sm text-zinc-600"><Smartphone className="shrink-0 text-vino-600" />
@@ -146,5 +153,29 @@ function ListaChips({ items, onChange, ejemplo }: { items: string[]; onChange: (
       </div>
       <div className="mt-3 flex gap-2"><input value={nuevo} onChange={(e) => setNuevo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && añadir()} placeholder={ejemplo} className={input} /><Boton disabled={!nuevo.trim()} onClick={añadir}><Plus size={16} /></Boton></div>
     </>
+  )
+}
+
+export function CopiaSeguridad({ compacto }: { compacto?: boolean }) {
+  const d = useDatos()
+  const [haciendo, setHaciendo] = useState(false)
+  const dias = diasDesdeCopia(d.config.ultima_copia)
+  const est = { empleados: d.empleados, turnos: d.turnos, fichajes: d.fichajes, solicitudes: d.solicitudes, config: d.config }
+  const hacer = async () => {
+    setHaciendo(true)
+    try { await copiaCompleta(est); d.guardarConfig({ ultima_copia: new Date().toISOString() }); toast('Copia descargada. Guárdala en tu ordenador o en Drive') }
+    catch { toast('No se pudo hacer la copia: revisa la conexión') }
+    setHaciendo(false)
+  }
+  const excel = async () => { try { await excelFichajes(est, d.config.empresa) } catch { toast('No se pudo descargar: revisa la conexión') } }
+  return (
+    <div className="space-y-3">
+      {!compacto && <p className="text-sm text-zinc-600">Descarga una vez al mes una copia completa de todo (empleados, turnos, fichajes con sus correcciones y solicitudes) y guárdala en tu ordenador o en Google Drive. Así tienes el registro de jornada asegurado durante los 4 años que exige la ley, pase lo que pase con la app.</p>}
+      <p className={cx('text-sm font-medium', dias === null || dias >= 30 ? 'text-amber-700' : 'text-emerald-700')}>{dias === null ? 'Todavía no se ha hecho ninguna copia' : dias === 0 ? 'Última copia: hoy' : `Última copia: hace ${dias} ${dias === 1 ? 'día' : 'días'}`}</p>
+      <div className="flex flex-wrap gap-2">
+        <Boton onClick={hacer} disabled={haciendo}><DatabaseBackup size={16} />{haciendo ? 'Preparando…' : 'Descargar copia completa'}</Boton>
+        {!compacto && <Boton tipo="secundario" onClick={excel}><FileSpreadsheet size={16} />Excel con todos los fichajes</Boton>}
+      </div>
+    </div>
   )
 }

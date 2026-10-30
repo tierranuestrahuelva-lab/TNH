@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowRight, CalendarRange, Clock, Coffee, LogIn, Palmtree, PartyPopper, UserCheck, UserX } from 'lucide-react'
 import { useDatos } from '../lib/datos'
+import { diasDesdeCopia } from '../lib/copia'
+import { CopiaSeguridad } from './Ajustes'
 import { useIndices } from '../lib/usar'
 import { aMin, fechaCorta, fechaLarga, fmtH, horaDe, hoy, lunesDe, semana, sumarDias, diaSemana, deIso } from '../lib/fechas'
 import { TIPOS, avisosSemana, huecosCobertura, resumenFichajes, textoTramos } from '../lib/reglas'
@@ -38,8 +40,15 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
   const saludo = d.getHours() < 14 ? 'Buenos días' : d.getHours() < 21 ? 'Buenas tardes' : 'Buenas noches'
   const manana = sumarDias(f, 1)
 
+  const diasCopia = diasDesdeCopia(config.ultima_copia)
   return (
     <div className="space-y-6">
+      {(diasCopia === null || diasCopia >= 30) && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 text-sm text-amber-900"><b>Toca la copia de seguridad mensual.</b> Descárgala y guárdala en tu ordenador o en Drive: así el registro de jornada queda asegurado los 4 años que pide la ley.</p>
+          <CopiaSeguridad compacto />
+        </div>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-cond text-xs uppercase tracking-[0.2em] text-lila-500 first-letter:uppercase">{fechaLarga(f)}</p>

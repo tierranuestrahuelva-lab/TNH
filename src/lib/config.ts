@@ -5,6 +5,8 @@ export const COLORES = ['#830040', '#B771A0', '#1f2937', '#0f766e', '#b45309', '
 export const CONFIG_BASE: Config = {
   empresa: 'CONSTANTIN BECERRA S.L. · Tierra Nuestra Huelva',
   cif: 'B21295688',
+  domicilio: 'C/ Fernando el Católico, 34 · 21003 Huelva',
+  email_privacidad: 'tnh@tierranuestrahuelva.es',
   centros: ['Tienda Huelva', 'Almacén', 'Reparto'],
   puestos: ['Dirección', 'Encargado/a de tienda', 'Dependiente/a', 'Sumiller', 'Comercial', 'Repartidor/a', 'Mozo/a de almacén', 'Administrativo/a'],
   plantillas: [
