@@ -1,0 +1,361 @@
+{
+ "pack": "Semana 1 de noviembre 2026 (2-8 nov)",
+ "piezas": [
+  {
+   "id": "01_lun_horeca_carta",
+   "fecha": "2026-11-02",
+   "hora": "13:30",
+   "redes": [
+    "Instagram (carrusel)",
+    "Facebook"
+   ],
+   "formato": "post",
+   "audiencia": "horeca",
+   "tipo": "servicio",
+   "producto_ids": [],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "kicker": "Para hostelería",
+     "titulo": "Su carta de vinos,<br>a la altura de su cocina",
+     "sub": "Diseñamos y actualizamos cartas de vinos para restaurantes y bares de Huelva.",
+     "cta": "Deslice para ver más  →"
+    },
+    {
+     "tpl": "lista",
+     "kicker": "Qué incluye",
+     "titulo": "Un servicio completo",
+     "items": [
+      {
+       "t": "Selección a medida",
+       "d": "Vinos elegidos para su cocina, su público y su forma de trabajar."
+      },
+      {
+       "t": "Diseño con su imagen",
+       "d": "Carta impresa con su logo y sus colores, lista para la mesa."
+      },
+      {
+       "t": "Vino por copa",
+       "d": "Cristalería Riedel y sistema Coravin para servir por copa sin descorchar la botella."
+      },
+      {
+       "t": "Formación del equipo",
+       "d": "Catas y presentaciones para que su sala recomiende con seguridad."
+      }
+     ]
+    },
+    {
+     "tpl": "aviso",
+     "kicker": "Sin compromiso",
+     "titulo": "Solicite<br>su propuesta",
+     "sub": "Cuéntenos su proyecto y le preparamos una propuesta personalizada.",
+     "puntos": [
+      "WhatsApp +34 699 414 559",
+      "Teléfono 959 541 579",
+      "tnh@tierranuestrahuelva.es"
+     ]
+    }
+   ],
+   "caption": "Su carta de vinos dice mucho de su restaurante.\n\nEn Tierra Nuestra diseñamos cartas de vinos para hostelería: selección adaptada a su cocina y a su público, diseño con su imagen, vino por copa con cristalería Riedel y sistema Coravin, y formación para su equipo de sala.\n\nSeleccionamos vinos de toda España desde Huelva.\n\nSolicite su propuesta sin compromiso:\nWhatsApp 699 414 559 · Tel. 959 541 579\ntnh@tierranuestrahuelva.es",
+   "hashtags": [
+    "#HosteleriaHuelva",
+    "#CartaDeVinos",
+    "#VinosDeEspaña",
+    "#Huelva",
+    "#TierraNuestra"
+   ],
+   "notas": "Publicar como carrusel (3 imágenes en este orden). En Facebook, subir las 3 fotos en la misma publicación."
+  },
+  {
+   "id": "02_mar_story_horeca",
+   "fecha": "2026-11-03",
+   "hora": "10:00",
+   "redes": [
+    "Instagram (historia)",
+    "Facebook (historia)"
+   ],
+   "formato": "story",
+   "audiencia": "horeca",
+   "tipo": "servicio",
+   "producto_ids": [],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "kicker": "¿Tiene restaurante?",
+     "titulo": "Le diseñamos<br>la carta de vinos",
+     "sub": "Selección, diseño con su imagen, vino por copa y formación del equipo.",
+     "cta": "Responda a esta historia"
+    }
+   ],
+   "caption": "",
+   "hashtags": [],
+   "notas": "Historia. Opcional: añadir la etiqueta «Mencionar» o un enlace a WhatsApp."
+  },
+  {
+   "id": "03_mie_vino_barredero",
+   "fecha": "2026-11-04",
+   "hora": "13:30",
+   "redes": [
+    "Instagram",
+    "Facebook"
+   ],
+   "formato": "post",
+   "audiencia": "tienda",
+   "tipo": "vino",
+   "producto_ids": [
+    28184
+   ],
+   "slides": [
+    {
+     "tpl": "vino",
+     "kicker": "Vino de la semana",
+     "nombre": "Viña Barredero 2024",
+     "linea": "D.O. Condado de Huelva · Zalema",
+     "texto": "Un blanco de aquí: zalema de Rociana, de la mano de Bodegas Contreras Ruiz, cuarta generación de la familia Contreras.",
+     "chips": [
+      "Mariscos",
+      "Pescado blanco",
+      "Arroces"
+     ],
+     "img": "fotos/vina-barredero-2024.jpg"
+    }
+   ],
+   "caption": "Hoy toca blanco de aquí. 🍷\n\nViña Barredero 2024 es zalema del Condado de Huelva, elaborado en Rociana por Bodegas Contreras Ruiz, una casa que ya va por la cuarta generación de la familia Contreras.\n\n¿Con qué lo abrimos? Marisco, pescado blanco o un buen arroz.\n\nPídelo por WhatsApp al 699 414 559 o ven a vernos a la tienda: C/ Fernando el Católico, 34 (Huelva).",
+   "hashtags": [
+    "#VinosDeHuelva",
+    "#CondadoDeHuelva",
+    "#Zalema",
+    "#Huelva",
+    "#TierraNuestra"
+   ],
+   "notas": "Etiquetar a la bodega si tiene Instagram (buscar «Contreras Ruiz»)."
+  },
+  {
+   "id": "04_mie_story_barredero",
+   "fecha": "2026-11-04",
+   "hora": "19:30",
+   "redes": [
+    "Instagram (historia)",
+    "Facebook (historia)"
+   ],
+   "formato": "story",
+   "audiencia": "tienda",
+   "tipo": "vino",
+   "producto_ids": [
+    28184
+   ],
+   "slides": [
+    {
+     "tpl": "vino",
+     "kicker": "Vino de la semana",
+     "nombre": "Viña Barredero 2024",
+     "linea": "D.O. Condado de Huelva · Zalema",
+     "chips": [
+      "Mariscos",
+      "Pescado blanco",
+      "Arroces"
+     ],
+     "img": "fotos/vina-barredero-2024.jpg"
+    }
+   ],
+   "caption": "",
+   "hashtags": [],
+   "notas": "Historia. Opcional: compartir también la publicación del día."
+  },
+  {
+   "id": "05_jue_navidad_empresas",
+   "fecha": "2026-11-05",
+   "hora": "13:30",
+   "redes": [
+    "Instagram",
+    "Facebook"
+   ],
+   "formato": "post",
+   "audiencia": "horeca",
+   "tipo": "navidad",
+   "producto_ids": [
+    26823,
+    26828
+   ],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "fondo": "blanco",
+     "kicker": "Navidad 2026 · Empresas",
+     "titulo": "Regalos de empresa<br>que se recuerdan",
+     "tam": 92,
+     "sub": "Lotes y estuches de vino y gourmet para sus clientes y su equipo.",
+     "imgs": [
+      "fotos/surtido-navideno-premium.png",
+      "fotos/surtido-navideno-vina-ardanza.png"
+     ],
+     "imgalto": 360,
+     "cta": "Solicite presupuesto",
+     "pie": "Imagen orientativa · composición según disponibilidad"
+    }
+   ],
+   "caption": "Este año, regale los mejores vinos de España desde Huelva.\n\nPreparamos lotes y estuches de Navidad para empresas: vino, ibéricos y productos gourmet en caja de presentación. Reserve con tiempo y le ayudamos a elegir según su presupuesto y el número de regalos.\n\nSolicite presupuesto:\nWhatsApp 699 414 559 · Tel. 959 541 579\ntnh@tierranuestrahuelva.es",
+   "hashtags": [
+    "#RegalosDeEmpresa",
+    "#LotesDeNavidad",
+    "#NavidadHuelva",
+    "#Huelva",
+    "#TierraNuestra"
+   ],
+   "notas": "Fotos de lotes de la web (2024): la composición de este año puede cambiar; por eso lleva «imagen orientativa»."
+  },
+  {
+   "id": "06_jue_story_encuesta",
+   "fecha": "2026-11-05",
+   "hora": "19:30",
+   "redes": [
+    "Instagram (historia)"
+   ],
+   "formato": "story",
+   "audiencia": "tienda",
+   "tipo": "interaccion",
+   "producto_ids": [
+    28184,
+    28134
+   ],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "fondo": "crema",
+     "kicker": "Marisco el fin de semana",
+     "titulo": "¿Blanco de Huelva<br>o manzanilla?",
+     "sub": "Vota y te contamos nuestra recomendación.",
+     "imgs": [
+      "fotos/vina-barredero-2024.jpg",
+      "fotos/manzanilla-deliciosa-en-rama.png"
+     ],
+     "imgalto": 560,
+     "tam": 84
+    }
+   ],
+   "caption": "",
+   "hashtags": [],
+   "notas": "Añadir en Instagram la etiqueta «Encuesta» con las opciones «Blanco de Huelva» y «Manzanilla», debajo de las botellas. El sábado, responder con una historia: «Ganó… y os recomendamos…»."
+  },
+  {
+   "id": "07_vie_iberico_trio",
+   "fecha": "2026-11-06",
+   "hora": "13:30",
+   "redes": [
+    "Instagram",
+    "Facebook"
+   ],
+   "formato": "post",
+   "audiencia": "tienda",
+   "tipo": "maridaje",
+   "producto_ids": [
+    28134,
+    28172,
+    27852
+   ],
+   "slides": [
+    {
+     "tpl": "trio",
+     "kicker": "Plan de fin de semana",
+     "titulo": "Ibéricos y vino:<br>tres aciertos seguros",
+     "vinos": [
+      {
+       "img": "fotos/manzanilla-deliciosa-en-rama.png",
+       "nombre": "Manzanilla Deliciosa en Rama",
+       "linea": "Sanlúcar · Palomino Fino",
+       "uso": "Con jamón y caña de lomo"
+      },
+      {
+       "img": "fotos/amontillado-tio-diego.jpg",
+       "nombre": "Amontillado Tío Diego",
+       "linea": "Jerez · Palomino Fino",
+       "uso": "Con queso curado y chacinas"
+      },
+      {
+       "img": "fotos/dominio-del-verso-2018.jpg",
+       "nombre": "Dominio del Verso 2018",
+       "linea": "Almonaster la Real · Huelva",
+       "uso": "Con carnes a la brasa"
+      }
+     ]
+    }
+   ],
+   "caption": "Fin de semana de ibéricos en casa: aquí van tres aciertos seguros.\n\n1. Manzanilla Deliciosa en Rama (Valdespino): salina y fresca, la pareja clásica del jamón.\n2. Amontillado Tío Diego (Valdespino, Jerez): para el queso curado y las chacinas.\n3. Dominio del Verso 2018 (Almonaster la Real): tinto de la sierra de Huelva para la carne a la brasa.\n\n¿Cuál te llevas? Te lo preparamos: WhatsApp 699 414 559.",
+   "hashtags": [
+    "#Maridaje",
+    "#VinosDeJerez",
+    "#VinosDeHuelva",
+    "#Huelva",
+    "#TierraNuestra"
+   ],
+   "notas": ""
+  },
+  {
+   "id": "08_sab_story_club",
+   "fecha": "2026-11-07",
+   "hora": "11:00",
+   "redes": [
+    "Instagram (historia)",
+    "Facebook (historia)"
+   ],
+   "formato": "story",
+   "audiencia": "tienda",
+   "tipo": "club",
+   "producto_ids": [],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "kicker": "Club de Vinos Tierra Nuestra",
+     "titulo": "Una selección<br>especial para ti",
+     "sub": "Elige cómo recibirla: cada mes, cada dos meses o cada tres meses.",
+     "cta": "Toca el enlace y hazte socio"
+    }
+   ],
+   "caption": "",
+   "hashtags": [],
+   "notas": "Añadir en Instagram la etiqueta «Enlace» con: https://tierranuestrahuelva-lab.github.io/TNH/club/ (texto del enlace: HAZTE SOCIO), justo debajo del botón."
+  },
+  {
+   "id": "09_dom_enoturismo",
+   "fecha": "2026-11-08",
+   "hora": "12:00",
+   "redes": [
+    "Instagram",
+    "Facebook"
+   ],
+   "formato": "post",
+   "audiencia": "tienda",
+   "tipo": "efemeride",
+   "producto_ids": [
+    27882,
+    27445,
+    27852
+   ],
+   "slides": [
+    {
+     "tpl": "aviso",
+     "fondo": "blanco",
+     "kicker": "8 de noviembre · Día Europeo del Enoturismo",
+     "titulo": "Huelva también<br>es tierra de vino",
+     "tam": 96,
+     "sub": "Del Condado, junto a Doñana, a la sierra de Almonaster la Real: viñedos con mucho que contar.",
+     "imgs": [
+      "fotos/lume-brut.jpg",
+      "fotos/color-de-iris-2019.png",
+      "fotos/dominio-del-verso-2018.jpg"
+     ],
+     "imgalto": 430
+    }
+   ],
+   "caption": "Hoy es el Día Europeo del Enoturismo y lo celebramos con vinos de nuestra tierra:\n\n· Lumé Brut: espumoso de zalema del Condado de Huelva, de viñedos en la Reserva de la Biosfera de Doñana.\n· Color de Iris 2019: un blanco diferente, de colombard, de Almonaster la Real.\n· Dominio del Verso 2018: tinto de la sierra con 18 meses en barrica de roble francés.\n\n¿Cuál es tu vino onubense favorito? Cuéntanoslo en comentarios.",
+   "hashtags": [
+    "#VinosDeHuelva",
+    "#Enoturismo",
+    "#CondadoDeHuelva",
+    "#Huelva",
+    "#TierraNuestra"
+   ],
+   "notas": "Etiquetar a Bodegas Contreras Ruiz y a Cerro San Cristóbal si tienen Instagram."
+  }
+ ]
+}

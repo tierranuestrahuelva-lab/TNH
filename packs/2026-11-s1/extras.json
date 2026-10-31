@@ -1,0 +1,159 @@
+{
+ "calendario": [
+  {
+   "semana": "2-8 nov",
+   "estado": "LISTO (este pack)",
+   "temas": [
+    "Lun: carta de vinos para hostelería (carrusel)",
+    "Mar: historia hostelería",
+    "Mié: vino de la semana · Viña Barredero 2024",
+    "Jue: regalos de empresa Navidad + encuesta en historia",
+    "Vie: ibéricos y vino (3 aciertos)",
+    "Sáb: historia Club de Vinos",
+    "Dom 8: Día Europeo del Enoturismo"
+   ]
+  },
+  {
+   "semana": "9-15 nov",
+   "estado": "Propuesta",
+   "temas": [
+    "Mié 11 San Martín: vinos para la matanza y las chacinas",
+    "Club de Vinos: selección de noviembre (necesito qué vinos van)",
+    "Hostelería: vino por copa con Riedel y Coravin",
+    "Vino de la semana: Lumé Brut (burbujas de Huelva para Navidad)",
+    "Historias: recordatorio regalos de empresa"
+   ]
+  },
+  {
+   "semana": "16-22 nov",
+   "estado": "Propuesta",
+   "temas": [
+    "Lotes y estuches de Navidad para particulares",
+    "Cata o evento en tienda (si hay fecha: «previa reserva, plazas limitadas»)",
+    "Hostelería: carta de Navidad y menús de empresa",
+    "Vino de la semana: Dominio del Verso 2018",
+    "Detrás del mostrador: el equipo y la tienda (foto real)"
+   ]
+  },
+  {
+   "semana": "23-29 nov",
+   "estado": "Propuesta",
+   "temas": [
+    "Último aviso regalos de empresa (pedidos antes del 1 de diciembre)",
+    "Viernes 27 (Black Friday): selección especial, solo si decides hacer oferta",
+    "Vino de la semana: Color de Iris 2019",
+    "Consejo: cómo conservar y servir el vino en Navidad"
+   ]
+  },
+  {
+   "semana": "Diciembre (avance)",
+   "estado": "Idea",
+   "temas": [
+    "Puente 6-8 dic: regalos para la Inmaculada",
+    "Nochebuena y Navidad: maridajes de mesa",
+    "Nochevieja: espumosos y champagne",
+    "Reyes: regalos de última hora"
+   ]
+  }
+ ],
+ "respuestas": [
+  {
+   "caso": "Preguntan el precio en comentarios",
+   "texto": "¡Hola, [nombre]! Te lo pasamos por mensaje privado. Si lo prefieres, escríbenos al WhatsApp 699 414 559 y te atendemos al momento. — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "¿Tenéis este vino?",
+   "texto": "¡Hola, [nombre]! Lo comprobamos y te decimos ahora mismo. Si no lo tenemos, te proponemos uno parecido que te va a encantar. ¿Nos escribes al WhatsApp 699 414 559? — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "¿Hacéis envíos / reparto?",
+   "texto": "¡Hola, [nombre]! [COMPLETAR: zonas y condiciones de reparto]. Escríbenos al WhatsApp 699 414 559 con tu pedido y lo organizamos. — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "¿Qué horario tenéis?",
+   "texto": "¡Hola! Te esperamos en C/ Fernando el Católico, 34 (Huelva): [COMPLETAR: horario]. ¡Hasta pronto! — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Recomendación (regalo o comida)",
+   "texto": "¡Hola, [nombre]! Encantados de ayudarte. Cuéntanos para qué ocasión es, qué vais a comer y más o menos qué presupuesto tienes, y te proponemos dos o tres opciones. — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Empresa pregunta por lotes de Navidad (usted)",
+   "texto": "Buenos días, [nombre]. Muchas gracias por su interés. Para preparar su presupuesto, ¿nos indica cuántos lotes necesita, el importe aproximado por lote y la fecha de entrega? Puede escribirnos al WhatsApp 699 414 559 o a tnh@tierranuestrahuelva.es. Un saludo, Equipo Tierra Nuestra."
+  },
+  {
+   "caso": "Restaurante interesado en carta de vinos (usted)",
+   "texto": "Buenos días, [nombre]. Será un placer ayudarle con su carta de vinos. ¿Le parece que concertemos una visita para conocer su cocina y su forma de trabajar? Puede llamarnos al 959 541 579 o escribirnos al WhatsApp 699 414 559. Un saludo, Equipo Tierra Nuestra."
+  },
+  {
+   "caso": "Quieren hacerse socios del Club",
+   "texto": "¡Hola, [nombre]! Puedes apuntarte aquí en un minuto: https://tierranuestrahuelva-lab.github.io/TNH/club/ — eliges si quieres la selección cada mes, cada dos o cada tres meses. ¡Bienvenido/a! — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Comentario bonito / felicitación",
+   "texto": "¡Muchísimas gracias, [nombre]! Nos alegra un montón. ¡Te esperamos pronto por la tienda! — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Queja o problema",
+   "texto": "Hola, [nombre]. Sentimos mucho lo ocurrido y queremos solucionarlo cuanto antes. ¿Nos escribes por privado o al WhatsApp 699 414 559 con los detalles? Gracias por avisarnos. — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Parece menor de edad o pide alcohol para menores",
+   "texto": "Hola. Por ley no vendemos bebidas alcohólicas a menores de 18 años. ¡Gracias por entenderlo! — Equipo Tierra Nuestra"
+  },
+  {
+   "caso": "Spam, insultos o publicidad ajena",
+   "texto": "No responder. Ocultar el comentario (mantener pulsado → Ocultar) y, si se repite, restringir o bloquear la cuenta."
+  }
+ ],
+ "reglas_respuesta": [
+  "Responder en menos de 24 horas (mejor el mismo día).",
+  "Precios siempre por privado o WhatsApp, nunca en comentarios públicos.",
+  "Tienda y particulares: de tú y cercano. Empresas y hostelería: de usted.",
+  "Si no sabes algo, no lo inventes: «lo comprobamos y te decimos».",
+  "Las quejas, siempre a privado y con solución."
+ ],
+ "anuncios": [
+  {
+   "nombre": "Regalos de empresa Navidad",
+   "cuando": "9 al 29 de noviembre",
+   "objetivo": "Mensajes (que te escriban por WhatsApp o Instagram)",
+   "publico": "18+ (obligatorio en Meta; recomendado 25-65), Huelva y 30 km alrededor, intereses: pequeñas empresas, emprendedores, administradores de páginas de empresa",
+   "presupuesto": "6 €/día · 21 días ≈ 126 €",
+   "creatividad": "Publicación del jueves 5 (Regalos de empresa que se recuerdan)",
+   "texto_principal": "Regale Huelva y los mejores vinos de España. Lotes y estuches de Navidad para sus clientes y su equipo, en caja de presentación. Solicite presupuesto sin compromiso. Disfrute del vino con moderación.",
+   "titulo": "Regalos de empresa · Navidad 2026",
+   "boton": "Enviar mensaje"
+  },
+  {
+   "nombre": "Vino de la semana (tienda)",
+   "cuando": "Jueves a sábado de cada semana",
+   "objetivo": "Reconocimiento / alcance local",
+   "publico": "18+ (recomendado 25-65), 10 km alrededor de la tienda",
+   "presupuesto": "3 €/día · 3 días ≈ 9 €/semana",
+   "creatividad": "La publicación del vino de la semana",
+   "texto_principal": "Esta semana te recomendamos Viña Barredero 2024, zalema del Condado de Huelva. Pídelo por WhatsApp al 699 414 559 o ven a la tienda en C/ Fernando el Católico, 34. Disfruta del vino con moderación.",
+   "titulo": "Vino de la semana",
+   "boton": "Enviar mensaje de WhatsApp"
+  },
+  {
+   "nombre": "Cartas de vinos para hostelería",
+   "cuando": "2 al 15 de noviembre",
+   "objetivo": "Clientes potenciales (formulario) o mensajes",
+   "publico": "18+ (recomendado 25-60), provincia de Huelva, intereses: restauración, hostelería, gestión de restaurantes",
+   "presupuesto": "5 €/día · 14 días ≈ 70 €",
+   "creatividad": "Carrusel del lunes 2 (3 imágenes)",
+   "texto_principal": "Su carta de vinos dice mucho de su restaurante. Selección a medida, diseño con su imagen, vino por copa con Riedel y Coravin y formación para su equipo. Solicite su propuesta. Disfrute del vino con moderación.",
+   "titulo": "Su carta de vinos, a la altura de su cocina",
+   "boton": "Más información"
+  }
+ ],
+ "reglas_anuncios": [
+  "Edad mínima 18 años (norma de Meta para alcohol); por prudencia, mejor 25+.",
+  "Siempre la frase «Disfruta del vino con moderación».",
+  "Nunca relacionar el vino con salud, conducción, deporte, éxito social o sexual, ni con menores.",
+  "Por prudencia, no anunciar con dinero destilados de más de 20º (whisky, ginebra, brandy...).",
+  "Empezar con poco presupuesto, mirar resultados a los 3-4 días y quedarnos con el anuncio que mejor funcione.",
+  "Los anuncios se crean desde Meta Business Suite con la página de Facebook TierraNuestraHuelva vinculada a @tierranuestra.es."
+ ]
+}

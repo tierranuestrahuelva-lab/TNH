@@ -1,0 +1,172 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Fira;src:url('{{B}}/fonts/FiraSans-Light.ttf');font-weight:300}
+@font-face{font-family:Fira;src:url('{{B}}/fonts/FiraSans-Regular.ttf');font-weight:400}
+@font-face{font-family:Fira;src:url('{{B}}/fonts/FiraSans-Italic.ttf');font-weight:400;font-style:italic}
+@font-face{font-family:Fira;src:url('{{B}}/fonts/FiraSans-Medium.ttf');font-weight:500}
+@font-face{font-family:Fira;src:url('{{B}}/fonts/FiraSans-SemiBold.ttf');font-weight:600}
+@font-face{font-family:FiraC;src:url('{{B}}/fonts/FiraSansCondensed-Regular.ttf');font-weight:400}
+@font-face{font-family:FiraC;src:url('{{B}}/fonts/FiraSansCondensed-Medium.ttf');font-weight:500}
+@font-face{font-family:FiraC;src:url('{{B}}/fonts/FiraSansCondensed-SemiBold.ttf');font-weight:600}
+:root{--g:#830040;--l:#B771A0;--n:#1d1a1b;--c:#F6F1EC;--lc:#EBD9E4}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:{{W}}px;height:{{H}}px;overflow:hidden}
+body{font-family:Fira;color:var(--n);-webkit-font-smoothing:antialiased}
+.cv{position:relative;width:{{W}}px;height:{{H}}px;overflow:hidden;display:flex;flex-direction:column}
+.crema{background:var(--c)} .blanco{background:#fff} .granate{background:var(--g);color:#fff}
+.k{font-family:FiraC;font-weight:500;text-transform:uppercase;letter-spacing:.22em;color:var(--l);font-size:30px}
+.granate .k{color:var(--lc)}
+h1{font-weight:300;line-height:1.04;color:var(--g);letter-spacing:-.01em}
+.granate h1{color:#fff}
+.meta{font-family:FiraC;font-weight:500;text-transform:uppercase;letter-spacing:.12em;font-size:28px;color:var(--n)}
+.granate .meta{color:#fff}
+.rule{width:110px;height:4px;background:var(--g);margin:30px 0}
+.granate .rule{background:var(--l)}
+p.t{font-size:34px;line-height:1.38;color:#3a3436}
+.granate p.t{color:#f3e9ef}
+.chips{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.chip{border:2px solid var(--l);color:var(--g);border-radius:40px;padding:8px 22px;font-size:26px;font-family:FiraC;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.top{display:flex;justify-content:space-between;align-items:center;padding:56px 64px 0}
+.logo{height:{{ 64 if story else 58 }}px}
+.pag{font-family:FiraC;font-size:26px;letter-spacing:.15em;color:var(--l)}
+.granate .pag{color:var(--lc)}
+.band{background:var(--g);color:#fff;padding:30px 64px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.crema .band,.blanco .band{}
+.granate .band{background:#fff;color:var(--g)}
+.band .wa{display:flex;align-items:center;gap:16px;font-size:34px;font-weight:500;white-space:nowrap}
+.band .wa svg{width:44px;height:44px}
+.band .dir{white-space:nowrap;font-family:FiraC;font-size:23px;letter-spacing:.08em;text-transform:uppercase;opacity:.92;text-align:right;line-height:1.35}
+.foot{padding:0 64px 46px;display:flex;justify-content:space-between;align-items:flex-end;font-family:FiraC;font-size:24px;letter-spacing:.1em;text-transform:uppercase;color:#6b5f64}
+.granate .foot{color:#f0dde8}
+.resp{font-family:FiraC;font-size:22px;letter-spacing:.06em;color:#8a7f84;text-transform:none}
+.granate .resp{color:#e6cfdc}
+/* vino */
+.vino{flex:1;display:flex;padding:20px 64px 40px;gap:40px;min-height:0}
+.vino .bot{flex:0 0 38%;display:flex;align-items:flex-end;justify-content:center}
+.vino .bot img{height:96%;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:multiply}
+.vino .txt{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.vino h1{font-size:84px;margin-top:22px}
+/* story vino */
+.svino{flex:1;display:flex;flex-direction:column;align-items:center;padding:40px 80px 0;text-align:center;min-height:0}
+.svino .bot{height:820px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:46px}
+.svino .bot img{height:100%;width:auto;mix-blend-mode:multiply}
+.svino h1{font-size:92px;margin-top:20px}
+.svino .rule{margin:30px auto}
+.svino .chips{justify-content:center}
+/* aviso */
+.aviso{flex:1;display:flex;flex-direction:column;justify-content:center;padding:30px 80px;min-height:0}
+.aviso h1{font-size:{{ s.tam or 104 }}px;margin:26px 0 0}
+.aviso .sub{font-size:40px;line-height:1.3;margin-top:28px;font-weight:300}
+.puntos{list-style:none;margin-top:34px}
+.puntos li{font-size:34px;line-height:1.35;padding:12px 0 12px 46px;position:relative}
+.puntos li:before{content:"";position:absolute;left:0;top:30px;width:22px;height:3px;background:var(--l)}
+.cta{display:inline-block;margin-top:40px;background:#fff;color:var(--g);font-family:FiraC;font-weight:600;font-size:32px;letter-spacing:.12em;text-transform:uppercase;padding:20px 34px;border-radius:6px;align-self:flex-start}
+.crema .cta,.blanco .cta{background:var(--g);color:#fff}
+.card{background:#fff;border-radius:18px;padding:26px;margin-top:40px;display:flex;justify-content:center;align-items:flex-end;gap:26px}
+.card img{height:{{ s.imgalto or 420 }}px;width:auto;max-width:{{ (100/((s.imgs|length) or 1))|round(0,'floor') }}%;object-fit:contain}
+.story .aviso{padding:40px 90px}
+/* lista */
+.lista{flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 80px;min-height:0}
+.lista h1{font-size:{{ s.tam or 84 }}px;margin-top:22px}
+.items{margin-top:42px;display:flex;flex-direction:column;gap:30px}
+.it{display:flex;gap:30px;align-items:flex-start}
+.it .n{font-weight:300;font-size:76px;line-height:.9;color:var(--l);min-width:70px}
+.it b{display:block;font-weight:500;font-size:38px;color:var(--g);margin-bottom:6px}
+.granate .it b{color:#fff}
+.it span{font-size:31px;line-height:1.35;color:#4a4246}
+.granate .it span{color:#f3e9ef}
+/* trio */
+.trio{flex:1;display:flex;flex-direction:column;padding:10px 64px 30px;min-height:0}
+.trio h1{font-size:{{ s.tam or 78 }}px;margin-top:20px}
+.trio .tt{margin-top:18px}
+.vinos3{flex:1;display:flex;gap:26px;margin-top:30px;min-height:0}
+.v3{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:0}
+.v3 .bi{flex:1;display:flex;align-items:flex-end;justify-content:center;min-height:0;width:100%}
+.v3 img{height:100%;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:multiply}
+.v3 .nm{font-weight:500;font-size:29px;color:var(--g);margin-top:18px;line-height:1.15}
+.v3 .ln{font-family:FiraC;font-size:22px;letter-spacing:.08em;text-transform:uppercase;color:#5a5055;margin-top:8px;line-height:1.3}
+.v3 .us{font-size:24px;color:#4a4246;margin-top:8px;line-height:1.3;font-style:italic}
+.story .vinos3{flex:0 0 auto;height:760px}
+.story .trio{padding-top:40px}
+.story .aviso h1{font-size:{{ ((s.tam or 104)*1.15)|int }}px}
+.story .aviso .sub{font-size:46px}
+.story .cta{font-size:36px;padding:24px 38px}
+.story .k{font-size:34px}
+.story p.t{font-size:40px}
+.svino .bot{height:700px} .svino{padding-bottom:40px} .svino .chips{margin-top:10px}
+.svino .chip{font-size:30px}
+.safe{height:{{ 300 if story else 0 }}px;flex:0 0 auto}
+</style></head><body>
+{% set fondo = s.fondo or ('granate' if s.tpl in ['aviso'] else 'crema') %}
+<div class="cv {{fondo}} {{'story' if story else 'post'}}">
+  <div class="top" {% if story %}style="padding-top:{{ 230 }}px"{% endif %}>
+    <img class="logo key" src="{{B}}/{{ 'logo-blanco.svg' if fondo=='granate' else 'logo-color.svg' }}">
+    {% if s.pag %}<div class="pag">{{s.pag}}</div>{% endif %}
+  </div>
+
+{% if s.tpl=='vino' and not story %}
+  <div class="vino">
+    <div class="bot"><img src="{{s.img}}"></div>
+    <div class="txt fit key">
+      <div class="k">{{s.kicker}}</div>
+      <h1>{{s.nombre}}</h1>
+      <div class="meta" style="margin-top:22px">{{s.linea}}</div>
+      <div class="rule"></div>
+      <p class="t">{{s.texto}}</p>
+      {% if s.chips %}<div class="chips">{% for c in s.chips %}<span class="chip">{{c}}</span>{% endfor %}</div>{% endif %}
+    </div>
+  </div>
+{% elif s.tpl=='vino' and story %}
+  <div class="svino fit key">
+    <div class="bot"><img src="{{s.img}}"></div>
+    <div class="k">{{s.kicker}}</div>
+    <h1>{{s.nombre}}</h1>
+    <div class="meta" style="margin-top:20px">{{s.linea}}</div>
+    <div class="rule"></div>
+    {% if s.chips %}<div class="chips">{% for c in s.chips %}<span class="chip">{{c}}</span>{% endfor %}</div>{% endif %}
+  </div>
+{% elif s.tpl=='aviso' %}
+  <div class="aviso fit key">
+    {% if s.kicker %}<div class="k">{{s.kicker}}</div>{% endif %}
+    <h1>{{s.titulo|safe}}</h1>
+    {% if s.sub %}<div class="sub">{{s.sub|safe}}</div>{% endif %}
+    {% if s.puntos %}<ul class="puntos">{% for x in s.puntos %}<li>{{x}}</li>{% endfor %}</ul>{% endif %}
+    {% if s.imgs %}<div class="card">{% for i in s.imgs %}<img src="{{i}}">{% endfor %}</div>{% endif %}
+    {% if s.cta %}<div class="cta">{{s.cta}}</div>{% endif %}
+  </div>
+{% elif s.tpl=='lista' %}
+  <div class="lista fit key">
+    {% if s.kicker %}<div class="k">{{s.kicker}}</div>{% endif %}
+    <h1>{{s.titulo|safe}}</h1>
+    <div class="items">{% for x in s['items'] %}<div class="it"><div class="n">{{loop.index}}</div><div><b>{{x.t}}</b><span>{{x.d}}</span></div></div>{% endfor %}</div>
+  </div>
+{% elif s.tpl=='trio' %}
+  <div class="trio fit key">
+    <div class="k">{{s.kicker}}</div>
+    <h1>{{s.titulo|safe}}</h1>
+    {% if s.texto %}<p class="t tt">{{s.texto}}</p>{% endif %}
+    <div class="vinos3">{% for v in s.vinos %}<div class="v3"><div class="bi"><img src="{{v.img}}"></div><div class="nm">{{v.nombre}}</div><div class="ln">{{v.linea}}</div>{% if v.uso %}<div class="us">{{v.uso}}</div>{% endif %}</div>{% endfor %}</div>
+  </div>
+{% endif %}
+
+{% if s.banda != false %}
+  <div class="band key">
+    <div class="wa">{{ wa|safe }}<span>{{ s.banda_txt or ('WhatsApp 699 414 559' if aud=='horeca' else 'Pídelo por WhatsApp 699 414 559') }}</span></div>
+    <div class="dir">C/ Fernando el Católico, 34<br>Huelva · Tel. 959 541 579</div>
+  </div>
+{% endif %}
+{% if not story %}<div class="foot" style="padding-top:24px"><span>@tierranuestra.es</span><span class="resp">{{ s.pie or 'Disfruta del vino con moderación' }}</span></div>{% endif %}
+  <div class="safe"></div>
+</div>
+<script>
+// Ajuste: si el texto no cabe, reducir la letra poco a poco (máx. 30 %)
+window.__fit = (async()=>{await document.fonts.ready;
+ const out={shrink:1,overflow:false,keys:[]};
+ const f=document.querySelector('.fit'); if(f){let s=1;
+  const over=()=>f.scrollHeight>f.clientHeight+2||f.scrollWidth>f.clientWidth+2;
+  while(over()&&s>0.7){s-=0.02;f.style.zoom=s;} out.shrink=+s.toFixed(2); out.overflow=over();}
+ document.querySelectorAll('.key').forEach(e=>{const r=e.getBoundingClientRect();out.keys.push([e.className,Math.round(r.top),Math.round(r.bottom)])});
+ document.querySelectorAll('img').forEach(i=>{if(!i.complete||!i.naturalWidth)out.broken=(out.broken||0)+1});
+ return out})();
+</script>
+</body></html>

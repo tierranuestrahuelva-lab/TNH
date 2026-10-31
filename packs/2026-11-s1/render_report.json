@@ -1,0 +1,266 @@
+{
+ "01_lun_horeca_carta_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "aviso fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "01_lun_horeca_carta_2.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "lista fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "01_lun_horeca_carta_3.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "aviso fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "02_mar_story_horeca_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    230,
+    294
+   ],
+   [
+    "aviso fit key",
+    294,
+    1498
+   ],
+   [
+    "band key",
+    1498,
+    1620
+   ]
+  ],
+  "w": 1080,
+  "h": 1920,
+  "formato": "story"
+ },
+ "03_mie_vino_barredero_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "txt fit key",
+    134,
+    1090
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "04_mie_story_barredero_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    230,
+    294
+   ],
+   [
+    "svino fit key",
+    294,
+    1498
+   ],
+   [
+    "band key",
+    1498,
+    1620
+   ]
+  ],
+  "w": 1080,
+  "h": 1920,
+  "formato": "story"
+ },
+ "05_jue_navidad_empresas_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "aviso fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "06_jue_story_encuesta_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    230,
+    294
+   ],
+   [
+    "aviso fit key",
+    294,
+    1498
+   ],
+   [
+    "band key",
+    1498,
+    1620
+   ]
+  ],
+  "w": 1080,
+  "h": 1920,
+  "formato": "story"
+ },
+ "07_vie_iberico_trio_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "trio fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ },
+ "08_sab_story_club_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    230,
+    294
+   ],
+   [
+    "aviso fit key",
+    294,
+    1498
+   ],
+   [
+    "band key",
+    1498,
+    1620
+   ]
+  ],
+  "w": 1080,
+  "h": 1920,
+  "formato": "story"
+ },
+ "09_dom_enoturismo_1.jpg": {
+  "shrink": 1,
+  "overflow": false,
+  "keys": [
+   [
+    "logo key",
+    56,
+    114
+   ],
+   [
+    "aviso fit key",
+    114,
+    1130
+   ],
+   [
+    "band key",
+    1130,
+    1252
+   ]
+  ],
+  "w": 1080,
+  "h": 1350,
+  "formato": "post"
+ }
+}
