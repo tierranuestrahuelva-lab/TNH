@@ -1,6 +1,6 @@
 'use strict';
 /* TPV Tierra Nuestra — app de caja en el navegador. Datos en este dispositivo (IndexedDB + localStorage). */
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tpv_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -18,7 +18,7 @@ const fdate = iso => { const d = new Date(iso); return `${pad(d.getDate(), 2)}/$
 const ftime = iso => { const d = new Date(iso); return `${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}`; };
 function parseEur(s) {
   s = String(s ?? '').trim().replace(/\s|€/g, ''); if (!s) return NaN;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  if (s.includes(',') || /^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
   const v = parseFloat(s); return isNaN(v) ? NaN : Math.round(v * 100);
 }
 
@@ -115,7 +115,7 @@ function calc(t) {
   const lin = t.lineas.map(l => {
     const b0 = rnd(l.u * l.pu); bruto += b0;
     const br = rnd(l.u * l.pu * (100 - (l.dto || 0)) / 100);
-    const tot = rnd(br * (100 - (t.dto || 0)) / 100);
+    const tot = l.fijo != null ? l.fijo : rnd(br * (100 - (t.dto || 0)) / 100);
     total += tot; iva[l.i] = (iva[l.i] || 0) + tot;
     return { ...l, tot };
   });
@@ -274,7 +274,7 @@ function editLin(i) {
     if (!u || isNaN(p) || p < 0 || d < 0 || d > 100) return toast('Revisa los datos', 1);
     if (TK.orig && u > 0 && l.u < 0) return toast('En una devolución las unidades son negativas', 1);
     if (p !== l.pu) l.manual = true;
-    Object.assign(l, { u, pu: p, dto: d, i: parseInt($('#el-i').value, 10) }); saveTK(); cerrarModal(); renderTicket();
+    delete l.fijo; Object.assign(l, { u, pu: p, dto: d, i: parseInt($('#el-i').value, 10) }); saveTK(); cerrarModal(); renderTicket();
   };
 }
 function artLibre() {
@@ -492,8 +492,8 @@ function vTickets() {
   $('#tf-d').onchange = e => { TF.dia = e.target.value; vTickets(); };
   $('#tf-q').onchange = e => { TF.q = e.target.value; vTickets(); };
 }
-function devuelto(num) {
-  const m = {}; TICKETS.filter(t => t.orig === num).forEach(t => t.lineas.forEach(l => { const k = l.c + '|' + l.n + '|' + l.pu; m[k] = (m[k] || 0) - l.u; })); return m;
+function devuelto(num, campo = 'u') {
+  const m = {}; TICKETS.filter(t => t.orig === num).forEach(t => t.lineas.forEach(l => { const k = l.c + '|' + l.n + '|' + l.pu; m[k] = (m[k] || 0) - l[campo]; })); return m;
 }
 function verTicket(id) {
   const t = TICKETS.find(x => x.id === id); if (!t) return;
@@ -509,8 +509,8 @@ function verTicket(id) {
 function devolver(id) {
   const t = TICKETS.find(x => x.id === id); if (!t) return;
   if (TK.lineas.length) return toast('Termina o aparca el ticket en curso antes de una devolución', 1);
-  const dv = devuelto(t.num);
-  const filas = t.lineas.map((l, i) => { const ya = dv[l.c + '|' + l.n + '|' + l.pu] || 0; return { l, i, max: Math.max(0, l.u - ya), ya }; });
+  const dv = devuelto(t.num), dvImp = devuelto(t.num, 'tot');
+  const filas = t.lineas.map((l, i) => { const k = l.c + '|' + l.n + '|' + l.pu, ya = dv[k] || 0; return { l, i, max: Math.max(0, l.u - ya), ya, yaImp: dvImp[k] || 0 }; });
   modal(`Devolución de ${t.num}`, `<p class="muted" style="margin-top:0">Indica cuántas unidades devuelve el cliente. Se genera una factura rectificativa (serie ${esc(CFG.serieDev)}) y el stock vuelve a sumar en Sage.</p>
    <table class="t"><tr><th>Artículo</th><th class="r">Vendidas</th><th class="r">Ya devueltas</th><th class="r">Devolver</th></tr>
    ${filas.map(f => `<tr><td>${esc(f.l.n)}<br><span class="muted" style="font-size:12px">${eur(f.l.pu)}${f.l.dto ? ` dto ${f.l.dto}%` : ''}</span></td><td class="r">${f.l.u}</td><td class="r">${f.ya}</td><td class="r"><input type="number" min="0" max="${f.max}" value="${f.max}" data-i="${f.i}" class="dv-u" style="width:70px;padding:6px;border:1.5px solid var(--linea);border-radius:8px;text-align:right" ${f.max ? '' : 'disabled'}></td></tr>`).join('')}</table>`,
@@ -520,7 +520,9 @@ function devolver(id) {
     for (const inp of $$('.dv-u')) {
       const f = filas[+inp.dataset.i], u = parseInt(inp.value, 10) || 0;
       if (u < 0 || u > f.max) return toast('Unidades no válidas', 1);
-      if (u) lineas.push({ c: f.l.c, n: f.l.n, i: f.l.i, f: f.l.f, u: -u, pu: f.l.pu, dto: f.l.dto, manual: true });
+      // importe proporcional a lo cobrado; la última unidad se lleva el resto para no devolver ni un céntimo de más
+      const fijo = u === f.max ? -(f.l.tot - f.yaImp) : -rnd(f.l.tot * u / f.l.u);
+      if (u) lineas.push({ c: f.l.c, n: f.l.n, i: f.l.i, f: f.l.f, u: -u, pu: f.l.pu, dto: f.l.dto, manual: true, fijo });
     }
     if (!lineas.length) return toast('No hay nada que devolver', 1);
     TK = { lineas, cliente: t.cliente, tarifa: t.tarifa, dto: t.dto, orig: t.num }; saveTK();
