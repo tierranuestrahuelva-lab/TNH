@@ -6,7 +6,7 @@ import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, TipoFichaje } from '../lib/types'
 import { fechaLarga, fmtH, horaDe, hoy, lunesDe, semana, uid } from '../lib/fechas'
-import { TIPOS, minTurno, resumenFichajes, textoTramos } from '../lib/reglas'
+import { TIPOS, minTurno, minutosDia, resumenFichajes, textoTramos } from '../lib/reglas'
 import { toast } from '../lib/toast'
 import { Barra, Tarjeta, cx } from '../ui'
 import { useAhora } from './Hoy'
@@ -26,14 +26,14 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
   const t = ix.turnoDe(emp.id, f)
   const d = new Date(ahora)
   const sem = semana(lunesDe(f))
-  const trabSem = sem.reduce((s, x) => s + resumenFichajes(ix.fichajesDe(emp.id, x), ahora).min, 0)
+  const trabSem = sem.reduce((s, x) => s + minutosDia(ix.fichajesDe(emp.id, x), x, ahora), 0)
   const planSem = sem.reduce((s, x) => s + minTurno(ix.turnoDe(emp.id, x)), 0)
 
   const fichar = async (tipo: TipoFichaje) => {
     const ts = new Date().toISOString()
     let g: DatosGeo = {}
     if (geo) { setUbicando(true); g = await ubicarFichaje(emp, config, tipo); setUbicando(false) }
-    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts, tipo, ...g })
+    guardar('fichajes', { id: uid(), empleado_id: emp.id, ts, tipo, registrado_at: ts, ...g })
     setConfirmar(null)
     toast(`${NOMBRE[tipo]} registrada a las ${horaDe(ts)}${g.fuera_zona ? ' · fuera de zona' : g.geo_error ? ' · sin ubicación' : ''}`)
     navigator.vibrate?.(60)

@@ -1,5 +1,5 @@
 import type { Config, Empleado, Fichaje, Tramo, Turno } from './types'
-import { aMin, diaSemana, fmtH, sumarDias } from './fechas'
+import { aMin, deIso, diaSemana, fmtH, iso, sumarDias } from './fechas'
 
 export const minTramo = (t: Tramo) => { let d = aMin(t.f) - aMin(t.i); if (d <= 0) d += 1440; return d }
 export const minTramos = (ts: Tramo[]) => ts.reduce((s, t) => s + minTramo(t), 0)
@@ -69,9 +69,15 @@ export function resumenFichajes(fs: Fichaje[], ahora = Date.now()) {
   let estado: 'fuera' | 'dentro' | 'pausa' = 'fuera'
   for (const f of orden) {
     const t = new Date(f.ts).getTime()
-    if (f.tipo === 'entrada' || f.tipo === 'vuelta') { desde = t; estado = 'dentro' }
+    if (f.tipo === 'entrada' || f.tipo === 'vuelta') { desde ??= t; estado = 'dentro' }
     else { if (desde !== null) min += (t - desde) / 6e4; desde = null; estado = f.tipo === 'pausa' ? 'pausa' : 'fuera' }
   }
   if (desde !== null) min += (ahora - desde) / 6e4
   return { min, estado, primera: orden[0], ultima: orden[orden.length - 1], abierto: desde !== null }
+}
+
+/** Minutos trabajados en un día: si quedó abierto, hoy cuenta hasta ahora y un día pasado solo hasta su medianoche */
+export function minutosDia(fs: Fichaje[], dia: string, ahora = Date.now()) {
+  const finDia = deIso(sumarDias(dia, 1)).getTime() - 1000
+  return resumenFichajes(fs, dia === iso(new Date(ahora)) ? ahora : Math.min(ahora, finDia)).min
 }

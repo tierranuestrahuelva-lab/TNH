@@ -5,7 +5,7 @@ import logo from '../assets/logo-white.svg'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, Fichaje, TipoFichaje } from '../lib/types'
-import { DIAS_C, deIso, diaSemana, diasMes, fechaLarga, fmtH, horaDe, hoy, mesDe, nombreMes, sumarMes, uid } from '../lib/fechas'
+import { DIAS_C, deIso, diaSemana, diasMes, fechaLarga, fmtH, horaDe, hoy, mesDe, nombreMes, sumarDias, sumarMes, uid } from '../lib/fechas'
 import { TIPOS, minTurno, resumenFichajes, textoTramos } from '../lib/reglas'
 import { csv } from '../lib/exportar'
 import { toast } from '../lib/toast'
@@ -24,7 +24,7 @@ export default function Fichajes({ soloEmp }: { soloEmp?: Empleado }) {
   const dias = diasMes(mes)
   const filas = dias.map((d) => {
     const fs = ix.fichajesDe(emp.id, d), t = ix.turnoDe(emp.id, d)
-    const r = resumenFichajes(fs, d === hoy() ? Date.now() : new Date(d + 'T23:59:59').getTime())
+    const r = resumenFichajes(fs, d === hoy() ? Date.now() : deIso(sumarDias(d, 1)).getTime() - 1000)
     const entradas = fs.filter((f) => f.tipo === 'entrada'), salidas = fs.filter((f) => f.tipo === 'salida')
     const pausaMin = (() => { let m = 0, p: number | null = null; for (const f of fs) { if (f.tipo === 'pausa') p = new Date(f.ts).getTime(); if (f.tipo === 'vuelta' && p) { m += (new Date(f.ts).getTime() - p) / 6e4; p = null } } return m })()
     const anul = ix.anuladosDe(emp.id, d)

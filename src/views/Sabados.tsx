@@ -3,9 +3,10 @@ import { ArrowUp } from 'lucide-react'
 import { turnoId, useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { RuedaSabados, Tramo, Turno } from '../lib/types'
-import { DIAS, deIso, fechaCorta, fmtH, sumarDias, aMin } from '../lib/fechas'
+import { DIAS, deIso, fechaCorta, fmtH, sumarDias } from '../lib/fechas'
 import { minTramos, textoTramos } from '../lib/reglas'
 import { toast } from '../lib/toast'
+import { compensarTurno, tocanSabado } from '../lib/sabados'
 import { Avatar, Boton, Campo, Modal, cx, input } from '../ui'
 
 const semanasEntre = (a: string, b: string) => Math.round((deIso(b).getTime() - deIso(a).getTime()) / (7 * 864e5))
@@ -35,20 +36,13 @@ export default function Sabados({ lunes, onCerrar }: { lunes: string; onCerrar: 
   })
 
   const n = Math.min(porSabado, Math.max(ids.length, 1))
-  const tocan = (k: number) => ids.length ? Array.from({ length: n }, (_, j) => ids[(primero + k * n + j) % ids.length]) : []
+  const tocan = (k: number) => tocanSabado(ids, primero, n, k)
   const orden = [...ids, ...ix.activos.map((e) => e.id).filter((id) => !ids.includes(id))]
   const alternar = (id: string) => setIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
   const subir = (id: string) => { const i = ids.indexOf(id); if (i > 0) { const c = [...ids]; [c[i - 1], c[i]] = [c[i], c[i - 1]]; setIds(c) } }
   const diaComp = (L: string) => sumarDias(L, compDia)
 
-  const compensar = (t: Turno | undefined): Turno | null => {
-    if (!t || t.tipo !== 'trabajo' || compModo === 'nada') return null
-    if (compModo === 'dia') return { ...t, tipo: 'libre', tramos: [], centro: null, nota: 'Libre por trabajar el sábado' }
-    const quedan = t.tramos.filter((x) => (compModo === 'manana' ? aMin(x.i) >= 15 * 60 : aMin(x.i) < 15 * 60))
-    if (quedan.length === t.tramos.length) return null
-    if (!quedan.length) return { ...t, tipo: 'libre', tramos: [], centro: null, nota: 'Libre por trabajar el sábado' }
-    return { ...t, tramos: quedan, nota: `Compensa sábado (${compModo === 'manana' ? 'mañana' : 'tarde'} libre)` }
-  }
+  const compensar = (t: Turno | undefined) => compensarTurno(t, compModo)
 
   const aplicar = () => {
     if (!ids.length) return toast('Elige al menos una persona')

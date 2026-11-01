@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { useIndices } from '../lib/usar'
 import { diasMes, fmtH, hoy, mesDe, nombreMes, sumarMes } from '../lib/fechas'
-import { minTurno, resumenFichajes } from '../lib/reglas'
+import { minTurno, minutosDia } from '../lib/reglas'
 import { csv } from '../lib/exportar'
 import { Avatar, Boton, Tarjeta, cx } from '../ui'
 
@@ -16,9 +16,9 @@ export default function Informes() {
     for (const d of dias) {
       const t = ix.turnoDe(e.id, d), m = minTurno(t)
       plan += m; if (m) diasT++
-      const r = resumenFichajes(ix.fichajesDe(e.id, d), d === hoy() ? Date.now() : new Date(d + 'T23:59:59').getTime())
-      trab += r.min
-      if (m && !r.primera && d < hoy()) sinFichar++
+      const fs = ix.fichajesDe(e.id, d)
+      trab += minutosDia(fs, d)
+      if (m && !fs.length && d < hoy()) sinFichar++
       if (t?.tipo === 'vacaciones') vac++
       if (t?.tipo === 'baja') baja++
       if (t?.tipo === 'permiso') perm++
