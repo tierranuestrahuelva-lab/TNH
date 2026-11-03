@@ -39,6 +39,10 @@ for r in rows:
     if not c or not n or 'NO USAR' in n.upper() or not isinstance(p, (int, float)) or p <= 0: continue
     iva = r[3] if isinstance(r[3], (int, float)) else 0.21
     a = {'c': c, 'n': n, 'p': round(p * 100), 'i': round(iva * 100), 'f': fam(r[8], n)}
+    for k, col in (('d', 10), ('v', 13), ('o', 9), ('z', 12)):
+        x = re.sub(r'\s+', ' ', str(r[col] or '')).strip()
+        if x and x.upper() not in ('NINGUNA', 'NINGUNO', 'VARIOS', '-'): a[k] = x
+    if r[8]: a['y'] = re.sub(r'\s+', ' ', str(r[8])).strip()
     if bc.get(c): a['b'] = bc[c]
     if c in rank and rank[c] <= 400: a['r'] = rank[c]
     out.append(a)

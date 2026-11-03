@@ -45,3 +45,29 @@ Cada requisito tiene un código. Las pruebas lo llevan en su nombre (`[VEN-04] �
 ## Pantallas
 - **UI-01** Ninguna pantalla se sale por los lados en móvil (390 px), tablet (800 px) ni ordenador (1366 px).
 - **UI-02** Sin errores de JavaScript.
+
+## Móvil, tablet y PC (v1.1)
+- **MOV-01** En el móvil (390 px) se vende con una mano: catálogo a pantalla completa, barra de abajo con unidades y total, un toque abre el ticket y se cobra.
+- **MOV-02** En el móvil todos los botones de venta y cobro miden al menos 44 px de alto (tamaño de dedo).
+- **MOV-03** Se instala como app en el móvil, tablet o PC (manifest con iconos, pantalla completa, funciona sin conexión).
+- **MOV-04** Sin impresora a mano, el ticket se envía por WhatsApp con el detalle, el IVA y el enlace a la web de vinos.
+
+## Cámara
+- **CAM-01** La cámara lee códigos de barras EAN-13 de las botellas y añade el vino (también en navegadores sin lector nativo).
+- **CAM-02** La cámara lee QR: un QR de un producto lo añade, un QR con el número de un ticket lo abre, y un QR de un enlace cualquiera no toca el ticket.
+- **CAM-03** Modo ráfaga: se pueden pasar varios productos sin cerrar la cámara, y tener el mismo código delante no lo suma dos veces.
+
+## Voz
+- **VOZ-01** Dictando «dos [vino]» se añaden 2 unidades; también «quita el último», «total» y «cobrar».
+- **VOZ-02** Si la frase no es clara (varios vinos parecidos o ninguno) no se añade nada: se muestra la búsqueda.
+- **VOZ-03** Sin micrófono, sin permiso o en un navegador sin dictado sale un aviso claro y no hay errores.
+
+## Asistente
+- **IA-01** Recomienda solo vinos reales del catálogo, con su precio real, y todos cumplen lo pedido (tipo, comida, zona y precio).
+- **IA-02** Responde dudas de uso del TPV (devolución, cierre, descuentos…).
+- **IA-03** El asistente nunca cobra ni cambia el ticket por su cuenta: solo añade un vino cuando el vendedor lo toca. Lo que se escribe no se ejecuta como código.
+
+## Ticket y cobro
+- **QR-01** El QR del ticket (80 y 58 mm) lleva a https://tierranuestrahuelva-lab.github.io/TNH/vinos/#/ y se lee con una cámara.
+- **QR-02** Las cajas ya configuradas con el enlace antiguo pasan solas al nuevo; se puede cambiar en Ajustes.
+- **PAG-01** Forma de cobro «TPV virtual» (pago por enlace del banco): no admite más del pendiente y cuadra en caja, cierre Z y asiento (cuenta del banco).

@@ -8,7 +8,7 @@ srv = subprocess.Popen([sys.executable, '-m', 'http.server', '8766', '--bind', '
 time.sleep(1)
 casos = []
 try:
-    for capa, f in (('Recorrido completo', 'tests/e2e.py'), ('Árbitro', 'tests/arbitro.py')):
+    for capa, f in (('Recorrido completo', 'tests/e2e.py'), ('Árbitro', 'tests/arbitro.py'), ('Móvil, cámara, voz y asistente', 'tests/movil.py')):
         r = subprocess.run([sys.executable, f, 'http://127.0.0.1:8766/'], capture_output=True, text=True); out = r.stdout
         if r.stderr.strip(): print(r.stderr[-1500:])
         print(out)

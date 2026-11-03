@@ -1,6 +1,6 @@
 'use strict';
 /* TPV Tierra Nuestra — app de caja en el navegador. Datos en este dispositivo (IndexedDB + localStorage). */
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tpv_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -25,7 +25,7 @@ function parseEur(s) {
 /* ---------- configuración ---------- */
 const CFG0 = {
   empresa: { comercial: 'Tierra Nuestra', nombre: 'CONSTANTIN BECERRA S.L.', nif: 'B21295688', dir: 'C/ Fernando el Católico, 34', cp: '21003 Huelva', tel: '959 541 579', web: 'tierranuestra.es', email: 'tnh@tierranuestrahuelva.es', insta: '@tierranuestra.es' },
-  serie: 'T', serieDev: 'D', papel: 80, logo: true, qr: true, qrUrl: 'https://tierranuestra.es', codigoBarras: true,
+  serie: 'T', serieDev: 'D', papel: 80, logo: true, qr: true, qrUrl: 'https://tierranuestrahuelva-lab.github.io/TNH/vinos/#/', codigoBarras: true,
   pie: 'Gracias por su visita\nCambios y devoluciones en 15 días\npresentando este ticket',
   autoPrint: true, copias: 1, imprimirZ: true, limiteSimplificada: 300000,
   adminPin: '1234', operarios: [{ id: 'op1', nombre: 'Tienda', pin: '0000' }],
@@ -39,6 +39,7 @@ function deepMerge(a, b) {
   return a;
 }
 let CFG = deepMerge(JSON.parse(JSON.stringify(CFG0)), LS.get('cfg', {}));
+if (CFG.qrUrl === 'https://tierranuestra.es') CFG.qrUrl = CFG0.qrUrl;
 const saveCfg = () => LS.set('cfg', CFG);
 
 const FAMS = [
@@ -48,7 +49,7 @@ const FAMS = [
   ['gourmet', 'Gourmet', '#6b8e3e'], ['accesorios', 'Accesorios', '#7a7a7a'], ['otros', 'Otros', '#9a9a9a'],
 ];
 const FAM = Object.fromEntries(FAMS.map(f => [f[0], f]));
-const FORMAS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', bizum: 'Bizum' };
+const FORMAS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', bizum: 'Bizum', virtual: 'TPV virtual' };
 const IVAS = [21, 10, 4, 0];
 
 /* ---------- almacenamiento ---------- */
@@ -189,15 +190,15 @@ function loginKey(k) {
 /* ---------- vista venta ---------- */
 function vVenta() {
   const tarifas = [{ k: 'p', n: 'PVP Tienda' }, ...TARIFAS];
-  $('#main').innerHTML = `<div class="venta"><section class="cat">
+  $('#main').innerHTML = `<div class="venta${S.mtk ? ' vtk' : ''}"><section class="cat">
    <div class="buscar"><input id="q" placeholder="Buscar vino, código o pasar el lector de códigos de barras…" value="${esc(S.q)}" autocomplete="off" enterkeyhint="go">
-   ${'BarcodeDetector' in window ? '<button class="btn" data-a="camara">Cámara</button>' : ''}<button class="btn lila" data-a="libre">Artículo libre</button></div>
+   <button class="btn ico" data-a="camara" aria-label="Escanear con la cámara">${ICO.cam}<span>Cámara</span></button><button class="btn ico" data-a="mic" aria-label="Dictar por voz">${ICO.mic}<span>Voz</span></button><button class="btn ico" data-a="asistente" aria-label="Asistente">${ICO.ia}<span>Asistente</span></button><button class="btn lila" data-a="libre">Artículo libre</button></div>
    <div class="fams">${FAMS.map(([k, n, c]) => `<button data-a="fam" data-v="${k}" class="${S.fam === k ? 'on' : ''}"><i style="background:${c}"></i>${n}</button>`).join('')}</div>
    <div class="grid" id="grid"></div></section>
    <aside class="tk"><div class="tk-head">
      <button class="cli" data-a="cliente"><span class="muted" style="font-size:12px">Cliente</span><b id="cli-n"></b></button>
      <select id="tarifa" aria-label="Tarifa">${tarifas.map(t => `<option value="${t.k}" ${TK.tarifa === t.k ? 'selected' : ''}>${esc(t.n)}</option>`).join('')}</select>
-   </div><div class="lineas" id="lineas"></div><div class="tk-tot" id="tk-tot"></div></aside></div>`;
+   </div><div class="lineas" id="lineas"></div><div class="tk-tot" id="tk-tot"></div></aside><div class="mbar" id="mbar"></div></div>`;
   renderGrid(); renderTicket();
   const q = $('#q');
   q.oninput = () => { S.q = q.value; renderGrid(); };
@@ -247,6 +248,8 @@ function renderTicket() {
    <button class="btn" data-a="recuperar">Recuperar${PARK.length ? ` (${PARK.length})` : ''}</button><button class="btn peligro" data-a="vaciar" ${TK.lineas.length || TK.orig ? '' : 'disabled'}>Vaciar</button></div>
    <button class="btn vino grande cobrar" data-a="cobrar" ${TK.lineas.length ? '' : 'disabled'}>${c.total < 0 ? 'DEVOLVER' : 'COBRAR'} ${eur(Math.abs(c.total))}</button>`;
   const sel = L.querySelector('.lin.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+  const ul = $('#ultimo'); if (ul) ul.insertAdjacentHTML('beforeend', `<button class="btn ico" data-a="waTicket" data-v="${esc(S.ultimo.num)}" style="margin-top:16px">${ICO.wa}<span>Enviar por WhatsApp</span></button>`);
+  updMbar();
 }
 function addArt(a, u = 1) {
   S.ultimo = null;
@@ -457,7 +460,7 @@ function ticketHTML(t, o = {}) {
   <div class="sm c" style="margin-top:3px">IVA incluido</div>`}
   ${CFG.codigoBarras ? `<div class="bc">${barcodeSVG(t.num)}</div>` : ''}
   <div class="pie">${esc(CFG.pie)}</div>
-  ${CFG.qr && CFG.qrUrl ? `<div class="qr">${qrSVG(CFG.qrUrl)}<div class="sm">${esc(CFG.empresa.insta || CFG.empresa.web)}</div></div>` : ''}`;
+  ${CFG.qr && CFG.qrUrl ? `<div class="qr">${qrSVG(CFG.qrUrl)}<div class="sm">Descubre nuestros vinos${CFG.empresa.insta ? ' · ' + esc(CFG.empresa.insta) : ''}</div></div>` : ''}`;
 }
 function documentoImpresion(body, w) {
   return `<!doctype html><html><head><meta charset="utf-8"><base href="${esc(document.baseURI)}"><style>${CSS_TICKET(w)}</style><style id="pg">@page{size:${CFG.papel}mm 297mm;margin:0}</style></head><body>${body}</body></html>`;
@@ -503,6 +506,7 @@ function verTicket(id) {
    <div class="acciones" style="flex-direction:column;align-items:stretch">
     <button class="btn vino" data-a="reimprimir" data-v="${t.id}">Reimprimir (copia)</button>
     <button class="btn" data-a="regalo" data-v="${t.id}">Imprimir ticket regalo</button>
+    <button class="btn ico" data-a="waTicket" data-v="${t.id}">${ICO.wa}<span>Enviar por WhatsApp</span></button>
     ${t.tipo === 'venta' ? `<button class="btn" data-a="devolver" data-v="${t.id}">Devolución / cambio</button>` : ''}
    </div>${TICKETS.some(x => x.orig === t.num) ? `<p class="muted" style="font-size:13px">Tiene devoluciones: ${TICKETS.filter(x => x.orig === t.num).map(x => esc(x.num)).join(', ')}</p>` : ''}</div></div>`, '', 'ancho');
 }
@@ -544,7 +548,7 @@ function apertura(despues) {
   $('#ap-ok').onclick = ok; $('#ap-f').onkeydown = e => { if (e.key === 'Enter') ok(); };
 }
 function resumen(tks, caja) {
-  const r = { n: tks.length, ventas: 0, devol: 0, total: 0, formas: { efectivo: 0, tarjeta: 0, bizum: 0 }, ivas: {}, fams: {}, uds: 0, desde: null, hasta: null, entradas: 0, salidas: 0 };
+  const r = { n: tks.length, ventas: 0, devol: 0, total: 0, formas: { efectivo: 0, tarjeta: 0, bizum: 0, virtual: 0 }, ivas: {}, fams: {}, uds: 0, desde: null, hasta: null, entradas: 0, salidas: 0 };
   const ord = tks.slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
   r.desde = ord[0] ? ord[0].num : ''; r.hasta = ord.length ? ord[ord.length - 1].num : '';
   for (const t of tks) {
@@ -693,7 +697,7 @@ function lineasAsiento(tks) {
     const r = resumen(porDia[d]), f = d.split('-').reverse().join('/');
     const concepto = `Ventas TPV ${f} (${r.desde} a ${r.hasta})`.slice(0, 60);
     const apuntes = [];
-    const cobro = {}; Object.entries(r.formas).forEach(([k, v]) => { const cta = k === 'efectivo' ? sg.cuentaCaja : k === 'tarjeta' ? sg.cuentaTarjeta : sg.cuentaBizum; cobro[cta] = (cobro[cta] || 0) + v; });
+    const cobro = {}; Object.entries(r.formas).forEach(([k, v]) => { const cta = k === 'efectivo' ? sg.cuentaCaja : k === 'tarjeta' || k === 'virtual' ? sg.cuentaTarjeta : sg.cuentaBizum; cobro[cta] = (cobro[cta] || 0) + v; });
     Object.entries(cobro).forEach(([cta, v]) => v && apuntes.push({ cta, debe: v, haber: 0 }));
     const ventas = {}; Object.entries(r.ivas).forEach(([k, v]) => { const cta = sg.ventas[k] || sg.ventas[21]; ventas[cta] = (ventas[cta] || 0) + v.base; });
     Object.entries(ventas).forEach(([cta, v]) => v && apuntes.push({ cta, debe: 0, haber: v }));
@@ -922,23 +926,7 @@ function pruebaImp() {
   imprimir(ticketHTML(t));
 }
 
-/* ---------- cámara (BarcodeDetector) ---------- */
-async function camara() {
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); } catch (e) { return toast('No se pudo abrir la cámara', 1); }
-  const ov = modal('Escanear con la cámara', `<video id="cam-v" playsinline autoplay muted style="width:100%;border-radius:12px;background:#000"></video>`, `<button class="btn" data-a="cerrarModal">Cerrar</button>`);
-  const v = $('#cam-v'); v.srcObject = stream;
-  const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'itf'] });
-  let vivo = true;
-  const stop = () => { vivo = false; stream.getTracks().forEach(t => t.stop()); };
-  new MutationObserver((m, obs) => { if (!document.body.contains(ov)) { stop(); obs.disconnect(); } }).observe($('#modal-root'), { childList: true });
-  const loop = async () => {
-    if (!vivo) return;
-    try { const r = await det.detect(v); if (r.length) { const code = r[0].rawValue; cerrarModal(); entradaBuscar(code); return; } } catch (e) { }
-    setTimeout(loop, 250);
-  };
-  v.onloadeddata = loop;
-}
+
 
 /* ---------- acciones ---------- */
 const ACT = {
@@ -968,6 +956,7 @@ const ACT = {
   addOp() { CFG.operarios.push({ id: uid(), nombre: 'Nuevo', pin: String(1000 + Math.floor(Math.random() * 9000)) }); saveCfg(); vAjustes(); },
   delOp(v) { confirmar('Quitar operario', `¿Quitar a ${esc(CFG.operarios[+v].nombre)}?`, 'Quitar', () => { CFG.operarios.splice(+v, 1); saveCfg(); vAjustes(); }, 1); },
   pruebaImp, backup, restaurar, borrarTodo: () => pedirPin('Borrar datos', borrarTodo), camara,
+  mic(v) { microfono(v); }, asistente() { asistente(); }, iaChip(v, el) { preguntarIA(el.textContent); }, mtk, waTicket,
 };
 function aparcarSilencioso() { PARK.push({ ...TK, id: uid(), fecha: new Date().toISOString(), op: S.op.nombre, total: calc(TK).total }); LS.set('park', PARK); }
 document.addEventListener('click', e => {
