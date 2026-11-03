@@ -58,10 +58,13 @@ lados en un móvil.
 ## GEO · Ubicación al fichar
 - **GEO-01** Solo se pide ubicación a los puestos configurados (por defecto Repartidor/a y Comercial).
 - **GEO-02** Dentro del radio del sitio de trabajo → «En Almacén».
-- **GEO-03** Repartidor/a fuera del radio al fichar entrada o salida → «Fuera de zona».
+- **GEO-03** Repartidor/a fuera del radio al fichar la entrada → «Fuera de zona». Un comercial nunca sale «fuera de zona».
 - **GEO-04** Si el móvil deniega o no da la ubicación, el fichaje se guarda igualmente con el
   motivo («sin ubicación»); nunca se bloquea fichar.
 - **GEO-05** Las pausas no marcan «fuera de zona».
+- **GEO-06** El repartidor puede fichar la salida donde termine (último reparto, casa o tienda): se guarda la ubicación, sin «fuera de zona».
+- **GEO-07** En los puestos con «Avisar salida tarde», una salida fichada más de `margen_salida` minutos (15 por defecto) después del fin del turno sale en «Fichajes a revisar».
+- **GEO-08** Los puestos con «Horario libre» (Comercial por defecto) no generan avisos de retraso ni de «sin fichar».
 
 ## DAT · Datos
 - **DAT-01** Todo lo que la app escribe en la base de datos son columnas que existen (si no,
