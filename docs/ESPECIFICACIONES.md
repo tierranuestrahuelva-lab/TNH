@@ -43,6 +43,8 @@ lados en un móvil.
 - **CUA-07** «Tienda sin cubrir»: detecta los huecos del horario de apertura sin nadie asignado.
 - **CUA-08** El calendario de turnos se exporta al móvil (.ics) con hora de fin posterior a la de
   inicio, también en turnos que pasan de medianoche.
+- **CUA-09** En «Revisión legal» cada problema explica cómo arreglarlo y tiene el botón «Corregir», que abre el turno de esa persona y ese día (si el problema es de la semana, el día más indicado). Al guardar la corrección el problema desaparece.
+- **CUA-10** «Jornada flexible» (comerciales, ruta de clientes): solo se ponen las horas del día, sin hora de entrada ni salida. Cuenta como día trabajado (no libre) y para las horas de la semana y el máximo diario; no genera avisos de descanso ni de pausa. Es la opción por defecto para los puestos con horario libre.
 
 ## SAB · Sábados alternos
 - **SAB-01** La rueda reparte los sábados por turnos entre las personas elegidas, en orden, y
@@ -50,6 +52,7 @@ lados en un móvil.
 - **SAB-02** Con 2 personas por sábado no se repite nadie el mismo sábado.
 - **SAB-03** Compensación: «tarde libre» quita los tramos de tarde, «mañana libre» los de
   mañana, «día entero» deja el día libre y «no se compensa» no toca nada.
+- **SAB-04** Puede haber varias ruedas, una por grupo (p. ej. dependientas y repartidores). Cada grupo se turna solo entre sus personas y una rueda no cambia los sábados de otro grupo. La rueda única antigua sigue funcionando.
 
 ## AUS · Ausencias y solicitudes
 - **AUS-01** El empleado envía una solicitud y queda «pendiente».

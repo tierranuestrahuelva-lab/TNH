@@ -5,6 +5,7 @@ import type { Empleado, TipoTurno, Tramo, Turno } from '../lib/types'
 import { DIAS_C, diaSemana, fechaLarga, fmtH, semana, lunesDe } from '../lib/fechas'
 import { TIPOS, minTramos } from '../lib/reglas'
 import { toast } from '../lib/toast'
+import { flexible } from '../lib/geo'
 import { Avatar, Boton, Campo, Modal, cx, input } from '../ui'
 
 export default function EditorTurno({ emp, fecha, onCerrar }: { emp: Empleado | null; fecha: string | null; onCerrar: () => void }) {
@@ -15,10 +16,12 @@ export default function EditorTurno({ emp, fecha, onCerrar }: { emp: Empleado | 
   const [centro, setCentro] = useState('')
   const [nota, setNota] = useState('')
   const [extra, setExtra] = useState<string[]>([])
+  const [horas, setHoras] = useState(0)
 
   useEffect(() => {
     if (!emp || !fecha) return
-    setTipo(actual?.tipo || 'trabajo')
+    setTipo(actual?.tipo || (flexible(emp, config) ? 'flexible' : 'trabajo'))
+    setHoras(actual?.horas || Math.round((emp.horas_semana / 5) * 2) / 2 || 8)
     setTramos(actual?.tramos?.length ? actual.tramos : config.plantillas[0]?.tramos || [{ i: '10:00', f: '14:00' }])
     setCentro(actual?.centro || emp.centro || config.centros[0] || '')
     setNota(actual?.nota || '')
@@ -27,10 +30,10 @@ export default function EditorTurno({ emp, fecha, onCerrar }: { emp: Empleado | 
 
   if (!emp || !fecha) return null
   const dias = semana(lunesDe(fecha))
-  const ok = tipo !== 'trabajo' || (tramos.length > 0 && tramos.every((t) => t.i && t.f))
+  const ok = tipo === 'flexible' ? horas > 0 && horas <= 14 : tipo !== 'trabajo' || (tramos.length > 0 && tramos.every((t) => t.i && t.f))
 
   const guardarTodo = () => {
-    const filas: Turno[] = [fecha, ...extra].map((f) => ({ id: turnoId(emp.id, f), empleado_id: emp.id, fecha: f, tipo, tramos: tipo === 'trabajo' ? tramos : [], centro: tipo === 'trabajo' ? centro || null : null, nota: nota || null }))
+    const filas: Turno[] = [fecha, ...extra].map((f) => ({ id: turnoId(emp.id, f), empleado_id: emp.id, fecha: f, tipo, tramos: tipo === 'trabajo' ? tramos : [], centro: tipo === 'trabajo' ? centro || null : null, nota: nota || null, horas: tipo === 'flexible' ? horas : null }))
     guardar('turnos', filas)
     toast(filas.length > 1 ? `${filas.length} días guardados` : 'Turno guardado')
     onCerrar()
@@ -50,6 +53,12 @@ export default function EditorTurno({ emp, fecha, onCerrar }: { emp: Empleado | 
           ))}
         </div>
 
+        {tipo === 'flexible' && (
+          <div className="space-y-2 rounded-xl bg-lila-50 p-3">
+            <Campo label="Horas de ese día"><input type="number" aria-label="Horas de ese día" min={0.5} max={14} step={0.5} value={horas} onChange={(e) => setHoras(Number(e.target.value))} className={cx(input, 'tabular')} /></Campo>
+            <p className="text-xs text-lila-600">Sin hora fija de entrada ni salida: trabaja según las visitas a clientes. Ficha al empezar y al terminar (con ubicación) y las horas reales salen de sus fichajes.</p>
+          </div>
+        )}
         {tipo === 'trabajo' && <>
           <div>
             <p className="mb-2 font-cond text-xs uppercase tracking-wider text-vino-800/70">Turnos rápidos</p>

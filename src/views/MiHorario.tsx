@@ -47,7 +47,7 @@ export default function MiHorario({ emp }: { emp: Empleado }) {
                   <div className="min-w-0 flex-1">
                     {!t ? <p className={cx('text-sm', d === f ? 'text-white/70' : 'text-zinc-400')}>Sin asignar</p>
                       : t.tipo === 'trabajo' ? <><p className="font-semibold tabular">{textoTramos(t.tramos)}</p><p className={cx('truncate text-xs', d === f ? 'text-lila-100' : 'text-zinc-500')}>{fmtH(minTurno(t))}{t.centro && ` · ${t.centro}`}{t.nota && ` · ${t.nota}`}</p></>
-                      : <span className="inline-flex rounded-full px-2.5 py-0.5 text-sm font-medium" style={{ background: ti!.bg, color: ti!.fg }}>{ti!.label}</span>}
+                      : <span className="inline-flex rounded-full px-2.5 py-0.5 text-sm font-medium" style={{ background: ti!.bg, color: ti!.fg }}>{ti!.label}{t.tipo === 'flexible' && ` · ${fmtH(minTurno(t))}`}</span>}
                     {fest && <p className={cx('text-xs', d === f ? 'text-white' : 'text-blue-700')}>Festivo: {fest}</p>}
                     {pedido(d) && <p className={cx('text-xs font-medium', d === f ? 'text-white' : 'text-amber-700')}>Cambio pedido · pendiente de aprobar</p>}
                   </div>

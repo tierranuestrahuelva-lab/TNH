@@ -29,7 +29,7 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
     const tarde = !flexible(e, config) && ini !== null && r.estado === 'fuera' && !r.primera && mAhora > ini + 10
     return { e, t, r, tarde }
   })
-  const trabajan = filas.filter((x) => x.t?.tipo === 'trabajo')
+  const trabajan = filas.filter((x) => x.t?.tipo === 'trabajo' || x.t?.tipo === 'flexible')
   const dentro = filas.filter((x) => x.r.estado === 'dentro')
   const pausa = filas.filter((x) => x.r.estado === 'pausa')
   const ausentes = filas.filter((x) => x.t && ['vacaciones', 'baja', 'permiso'].includes(x.t.tipo))

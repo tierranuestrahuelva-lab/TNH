@@ -8,7 +8,7 @@ import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, TipoFichaje } from '../lib/types'
 import { fechaLarga, fmtH, horaDe, hoy, lunesDe, semana, uid } from '../lib/fechas'
-import { TIPOS, minTurno, minutosDia, resumenFichajes, textoTramos } from '../lib/reglas'
+import { TIPOS, textoTurno, minTurno, minutosDia, resumenFichajes, textoTramos } from '../lib/reglas'
 import { toast } from '../lib/toast'
 import { Barra, Tarjeta, cx } from '../ui'
 import { useAhora } from './Hoy'
@@ -60,7 +60,7 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm">
           <span className={cx('h-2.5 w-2.5 rounded-full', r.estado === 'dentro' ? 'bg-emerald-400 latido' : r.estado === 'pausa' ? 'bg-amber-300' : 'bg-white/50')} />{estadoTxt}
         </p>
-        <p className="mt-3 text-sm text-lila-100">Hoy llevas <b className="text-white tabular">{fmtH(r.min)}</b> · Tu turno: <b className="text-white">{!t ? 'sin turno' : t.tipo === 'trabajo' ? textoTramos(t.tramos) : TIPOS[t.tipo].label}</b></p>
+        <p className="mt-3 text-sm text-lila-100">Hoy llevas <b className="text-white tabular">{fmtH(r.min)}</b> · Tu turno: <b className="text-white">{!t ? 'sin turno' : textoTurno(t)}</b></p>
       </div>
 
       {abiertas.length > 0 && (

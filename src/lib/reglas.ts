@@ -3,11 +3,12 @@ import { aMin, deIso, diaSemana, fmtH, iso, sumarDias } from './fechas'
 
 export const minTramo = (t: Tramo) => { let d = aMin(t.f) - aMin(t.i); if (d <= 0) d += 1440; return d }
 export const minTramos = (ts: Tramo[]) => ts.reduce((s, t) => s + minTramo(t), 0)
-export const minTurno = (t?: Turno) => (t && t.tipo === 'trabajo' ? minTramos(t.tramos) : 0)
+export const minTurno = (t?: Turno) => (!t ? 0 : t.tipo === 'trabajo' ? minTramos(t.tramos) : t.tipo === 'flexible' ? Math.round((t.horas || 0) * 60) : 0)
 export const textoTramos = (ts: Tramo[]) => ts.map((t) => `${t.i}–${t.f}`).join(' · ')
 
 export const TIPOS: Record<string, { label: string; corto: string; bg: string; fg: string; borde: string }> = {
   trabajo: { label: 'Trabajo', corto: 'Turno', bg: '#fbf2f6', fg: '#830040', borde: '#830040' },
+  flexible: { label: 'Jornada flexible', corto: 'Flexible', bg: '#f7eef4', fg: '#8a3d70', borde: '#B771A0' },
   libre: { label: 'Libre', corto: 'Libre', bg: '#f4f4f5', fg: '#71717a', borde: '#d4d4d8' },
   vacaciones: { label: 'Vacaciones', corto: 'Vacaciones', bg: '#ecfdf5', fg: '#047857', borde: '#34d399' },
   baja: { label: 'Baja médica', corto: 'Baja', bg: '#fef2f2', fg: '#b91c1c', borde: '#f87171' },
@@ -16,7 +17,18 @@ export const TIPOS: Record<string, { label: string; corto: string; bg: string; f
   formacion: { label: 'Formación', corto: 'Formación', bg: '#f5f3ff', fg: '#6d28d9', borde: '#a78bfa' },
 }
 
-export type Aviso = { nivel: 'error' | 'aviso' | 'info'; texto: string; empleado_id?: string; fecha?: string }
+export const textoTurno = (t: Turno) => (t.tipo === 'trabajo' ? textoTramos(t.tramos) : t.tipo === 'flexible' ? `Flexible · ${fmtH(minTurno(t))}` : TIPOS[t.tipo].label)
+
+export type ClaveAviso = 'max' | 'pausa' | 'festivo' | 'descanso' | 'libre' | 'contrato'
+export type Aviso = { nivel: 'error' | 'aviso' | 'info'; texto: string; empleado_id?: string; fecha?: string; clave?: ClaveAviso }
+export const ARREGLO: Record<ClaveAviso, string> = {
+  max: 'Acorta el turno de ese día o quítale un tramo.',
+  descanso: 'Retrasa la entrada de ese día o adelanta la salida del día anterior.',
+  libre: 'Pon al menos un día «Libre» esta semana (mejor junto al domingo).',
+  contrato: 'Quita horas algún día. Si son horas extra pactadas, puedes dejarlo así.',
+  festivo: 'Si no debe trabajar, márcalo «Festivo». Si trabaja, recuerda compensarle el día.',
+  pausa: 'No hace falta cambiar el cuadrante: basta con que fiche su pausa de 15 minutos.',
+}
 
 /** Comprueba la semana de un empleado según el Estatuto de los Trabajadores y la configuración */
 export function avisosSemana(emp: Empleado, dias: string[], turnoDe: (e: string, f: string) => Turno | undefined, cfg: Config, festivoDe: (f: string) => string | undefined): Aviso[] {
@@ -26,22 +38,23 @@ export function avisosSemana(emp: Empleado, dias: string[], turnoDe: (e: string,
     const t = turnoDe(emp.id, f)
     const m = minTurno(t)
     total += m
-    if (!t || t.tipo !== 'trabajo') { libres++; continue }
-    if (m > cfg.max_horas_dia * 60) r.push({ nivel: 'error', texto: `${fmtH(m)} el ${f.slice(8)}: supera ${cfg.max_horas_dia} h/día`, empleado_id: emp.id, fecha: f })
-    const larga = t.tramos.find((x) => minTramo(x) > 360)
-    if (larga) r.push({ nivel: 'info', texto: `Jornada continuada de más de 6 h el día ${f.slice(8)}: corresponde pausa de 15 min`, empleado_id: emp.id, fecha: f })
+    if (!t || (t.tipo !== 'trabajo' && t.tipo !== 'flexible')) { libres++; continue }
+    if (m > cfg.max_horas_dia * 60) r.push({ nivel: 'error', clave: 'max', texto: `${fmtH(m)} el ${f.slice(8)}: supera ${cfg.max_horas_dia} h/día`, empleado_id: emp.id, fecha: f })
     const fest = festivoDe(f)
-    if (fest) r.push({ nivel: 'aviso', texto: `Trabaja en festivo (${fest}) el día ${f.slice(8)}`, empleado_id: emp.id, fecha: f })
+    if (fest) r.push({ nivel: 'aviso', clave: 'festivo', texto: `Trabaja en festivo (${fest}) el día ${f.slice(8)}`, empleado_id: emp.id, fecha: f })
+    if (t.tipo !== 'trabajo') continue
+    const larga = t.tramos.find((x) => minTramo(x) > 360)
+    if (larga) r.push({ nivel: 'info', clave: 'pausa', texto: `Jornada continuada de más de 6 h el día ${f.slice(8)}: corresponde pausa de 15 min`, empleado_id: emp.id, fecha: f })
     const ant = turnoDe(emp.id, sumarDias(f, -1))
     if (ant && ant.tipo === 'trabajo' && ant.tramos.length) {
       const fin = Math.max(...ant.tramos.map((x) => aMin(x.i) + minTramo(x)))
       const ini = Math.min(...t.tramos.map((x) => aMin(x.i))) + 1440
-      if (ini - fin < cfg.descanso_min * 60) r.push({ nivel: 'error', texto: `Solo ${fmtH(ini - fin)} de descanso antes del día ${f.slice(8)} (mínimo ${cfg.descanso_min} h)`, empleado_id: emp.id, fecha: f })
+      if (ini - fin < cfg.descanso_min * 60) r.push({ nivel: 'error', clave: 'descanso', texto: `Solo ${fmtH(ini - fin)} de descanso antes del día ${f.slice(8)} (mínimo ${cfg.descanso_min} h)`, empleado_id: emp.id, fecha: f })
     }
   }
-  if (libres === 0) r.push({ nivel: 'error', texto: 'Sin ningún día libre esta semana (mínimo día y medio)', empleado_id: emp.id })
+  if (libres === 0) r.push({ nivel: 'error', clave: 'libre', texto: 'Sin ningún día libre esta semana (mínimo día y medio)', empleado_id: emp.id })
   const contrato = emp.horas_semana * 60
-  if (contrato && total > contrato) r.push({ nivel: 'aviso', texto: `${fmtH(total - contrato)} por encima de su contrato (${emp.horas_semana} h)`, empleado_id: emp.id })
+  if (contrato && total > contrato) r.push({ nivel: 'aviso', clave: 'contrato', texto: `${fmtH(total - contrato)} por encima de su contrato (${emp.horas_semana} h)`, empleado_id: emp.id })
   return r
 }
 

@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ArrowUp } from 'lucide-react'
 import { turnoId, useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { RuedaSabados, Tramo, Turno } from '../lib/types'
-import { DIAS, deIso, fechaCorta, fmtH, sumarDias } from '../lib/fechas'
+import { DIAS, deIso, fechaCorta, fmtH, sumarDias, uid } from '../lib/fechas'
 import { minTramos, textoTramos } from '../lib/reglas'
 import { toast } from '../lib/toast'
-import { compensarTurno, tocanSabado } from '../lib/sabados'
+import { compensarTurno, gruposPorPuesto, ruedasDe, tocanSabado } from '../lib/sabados'
 import { Avatar, Boton, Campo, Modal, cx, input } from '../ui'
 
 const semanasEntre = (a: string, b: string) => Math.round((deIso(b).getTime() - deIso(a).getTime()) / (7 * 864e5))
@@ -19,12 +19,38 @@ const MODOS: { v: RuedaSabados['compModo']; l: string }[] = [
 const BLOQUEA = new Set(['vacaciones', 'baja', 'permiso', 'festivo'])
 
 export default function Sabados({ lunes, onCerrar }: { lunes: string; onCerrar: () => void }) {
-  const { config, guardar, guardarConfig } = useDatos()
+  const { config, guardarConfig } = useDatos()
   const ix = useIndices()
-  const prev = config.sabados
+  const ruedas = ruedasDe(config)
+  const grupos = gruposPorPuesto(ix.activos)
+  const [sel, setSel] = useState(() => ruedas[0]?.id || 'nueva')
+  const [grupo, setGrupo] = useState(() => (grupos.find((g) => g.ids.length > 1 && !ruedas.some((r) => r.nombre === g.puesto)) || grupos[0])?.puesto || '')
+  const actual = ruedas.find((r) => r.id === sel)
+  const chip = (on: boolean) => cx('rounded-full border px-3 py-1.5 text-sm font-medium', on ? 'border-vino-600 bg-vino-600 text-white' : 'border-vino-100 text-vino-700 hover:bg-vino-50')
+  const cabecera = (
+    <div className="mb-5 space-y-3 rounded-2xl bg-vino-50/50 p-3">
+      <p className="text-sm text-zinc-600">Cada grupo tiene su propia rueda: por ejemplo, las dependientas se turnan entre ellas y los repartidores entre ellos.</p>
+      <div className="flex flex-wrap gap-2">
+        {ruedas.map((r) => <button key={r.id} onClick={() => setSel(r.id!)} className={chip(sel === r.id)}>{r.nombre}</button>)}
+        <button onClick={() => setSel('nueva')} className={chip(sel === 'nueva')}>+ Nueva rueda</button>
+      </div>
+      {sel === 'nueva' && <Campo label="¿Qué grupo se turna los sábados?"><select aria-label="Grupo" className={input} value={grupo} onChange={(e) => setGrupo(e.target.value)}>{grupos.map((g) => <option key={g.puesto} value={g.puesto}>{g.puesto} ({g.ids.length} {g.ids.length === 1 ? 'persona' : 'personas'})</option>)}</select></Campo>}
+    </div>
+  )
+  const guardarRueda = (r: RuedaSabados) => {
+    const fila = { ...r, id: actual?.id || uid(), nombre: actual?.nombre || grupo }
+    guardarConfig({ ruedas_sabados: [...ruedas.filter((x) => x.id !== fila.id), fila], sabados: null })
+  }
+  const quitar = actual ? () => { guardarConfig({ ruedas_sabados: ruedas.filter((x) => x.id !== actual.id), sabados: null }); toast('Rueda quitada: el cuadrante no cambia'); setSel(ruedas.find((x) => x.id !== actual.id)?.id || 'nueva') } : undefined
+  return <FormRueda key={sel === 'nueva' ? 'n_' + grupo : sel} lunes={lunes} prev={actual || null} ini={sel === 'nueva' ? grupos.find((g) => g.puesto === grupo)?.ids || [] : null} cabecera={cabecera} onGuardar={guardarRueda} onQuitar={quitar} onCerrar={onCerrar} />
+}
+
+function FormRueda({ lunes, prev, ini, cabecera, onGuardar, onQuitar, onCerrar }: { lunes: string; prev: RuedaSabados | null; ini: string[] | null; cabecera: ReactNode; onGuardar: (r: RuedaSabados) => void; onQuitar?: () => void; onCerrar: () => void }) {
+  const { config, guardar } = useDatos()
+  const ix = useIndices()
   const apertura: Tramo[] = config.apertura[5]?.length ? config.apertura[5] : [{ i: '10:00', f: '14:00' }]
   const opcionesHorario = [{ n: 'Horario de apertura del sábado', t: apertura }, ...config.plantillas.map((p) => ({ n: p.nombre, t: p.tramos }))]
-  const [ids, setIds] = useState<string[]>(() => (prev?.ids || ix.activos.map((e) => e.id)).filter((id) => ix.activos.some((e) => e.id === id)))
+  const [ids, setIds] = useState<string[]>(() => (prev?.ids || ini || ix.activos.map((e) => e.id)).filter((id) => ix.activos.some((e) => e.id === id)))
   const [porSabado, setPorSabado] = useState(prev?.porSabado || 1)
   const [tramos, setTramos] = useState<Tramo[]>(prev?.tramos || apertura)
   const [compDia, setCompDia] = useState(prev?.compDia ?? 0)
@@ -66,7 +92,7 @@ export default function Sabados({ lunes, onCerrar }: { lunes: string; onCerrar: 
       }
     }
     guardar('turnos', filas)
-    guardarConfig({ sabados: { ids, porSabado: n, tramos, inicio: lunes, primero, compDia, compModo } })
+    onGuardar({ ids, porSabado: n, tramos, inicio: lunes, primero, compDia, compModo })
     toast(`Sábados repartidos en ${semanas} semanas${saltados ? ` · ${saltados} con ausencia, revísalos` : ''}`)
     onCerrar()
   }
@@ -74,7 +100,8 @@ export default function Sabados({ lunes, onCerrar }: { lunes: string; onCerrar: 
   const ejemplo = ids.length ? ix.empleado(tocan(0)[0]) : undefined
   return (
     <Modal abierto onCerrar={onCerrar} titulo="Sábados alternos" ancho="max-w-3xl"
-      pie={<><Boton tipo="secundario" onClick={onCerrar}>Cancelar</Boton><Boton disabled={!ids.length} onClick={aplicar}>Repartir sábados</Boton></>}>
+      pie={<>{onQuitar && <Boton tipo="peligro" className="mr-auto" onClick={onQuitar}>Quitar rueda</Boton>}<Boton tipo="secundario" onClick={onCerrar}>Cancelar</Boton><Boton disabled={!ids.length} onClick={aplicar}>Repartir sábados</Boton></>}>
+      {cabecera}
       <p className="mb-5 text-sm text-zinc-600">La app va turnando los sábados entre las personas que elijas. A quien le toca el sábado se le compensa con horas libres otro día de esa misma semana, para que sus horas cuadren.</p>
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">

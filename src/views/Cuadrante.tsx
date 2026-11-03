@@ -5,7 +5,7 @@ import { turnoId, useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, Turno, TipoTurno, Tramo } from '../lib/types'
 import { DIAS, DIAS_C, deIso, diaSemana, fechaCorta, fmtH, hoy, lunesDe, numSemana, semana, sumarDias, aMin } from '../lib/fechas'
-import { TIPOS, avisosSemana, huecosCobertura, minTramo, minTurno, textoTramos } from '../lib/reglas'
+import { ARREGLO, TIPOS, type Aviso, avisosSemana, huecosCobertura, minTramo, minTurno, textoTramos } from '../lib/reglas'
 import { csv, whatsapp } from '../lib/exportar'
 import { toast } from '../lib/toast'
 import { Avatar, Barra, Boton, Modal, Segmentos, cx } from '../ui'
@@ -13,6 +13,8 @@ import EditorTurno from './EditorTurno'
 import Sabados from './Sabados'
 
 type Pincel = { tipo: TipoTurno; tramos: Tramo[]; nombre: string; color: string } | 'borrar' | null
+
+const NIVEL = { error: 0, aviso: 1, info: 2 }
 
 export default function Cuadrante({ editable }: { editable: boolean }) {
   const { config, turnos, guardar, borrar } = useDatos()
@@ -59,7 +61,7 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
     if (!editable) return
     if (!pincel) return setEdit({ emp, fecha })
     if (pincel === 'borrar') { const t = ix.turnoDe(emp.id, fecha); if (t) borrar('turnos', t.id); return }
-    guardar('turnos', { id: turnoId(emp.id, fecha), empleado_id: emp.id, fecha, tipo: pincel.tipo, tramos: pincel.tramos, centro: pincel.tipo === 'trabajo' ? emp.centro || config.centros[0] : null, nota: null })
+    guardar('turnos', { id: turnoId(emp.id, fecha), empleado_id: emp.id, fecha, tipo: pincel.tipo, tramos: pincel.tramos, centro: pincel.tipo === 'trabajo' ? emp.centro || config.centros[0] : null, nota: null, horas: pincel.tipo === 'flexible' ? Math.round((emp.horas_semana / 5) * 2) / 2 : null })
   }
   const exportar = () => {
     csv(`cuadrante-${lunes}.csv`, [['Empleado', 'Puesto', ...dias.map((d) => `${DIAS[diaSemana(d)]} ${fechaCorta(d)}`), 'Horas'],
@@ -82,6 +84,12 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
   const coste = emps.reduce((s, e) => s + (e.coste_hora || 0) * minEmp(e) / 60, 0)
   const totalMin = emps.reduce((s, e) => s + minEmp(e), 0)
   const errores = avisos.filter((a) => a.nivel === 'error').length
+  const diaArreglo = (a: Aviso) => {
+    if (a.fecha) return a.fecha
+    const id = a.empleado_id!
+    if (a.clave === 'libre') return [...dias].reverse().find((d) => minTurno(ix.turnoDe(id, d)) > 0) || dias[6]
+    return dias.reduce((b, d) => (minTurno(ix.turnoDe(id, d)) > minTurno(ix.turnoDe(id, b)) ? d : b), dias[0])
+  }
 
   return (
     <div className="space-y-4">
@@ -122,7 +130,7 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
         <button onClick={() => setVerAvisos(true)} className={cx('rounded-2xl border p-4 text-left shadow-suave transition', errores ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-vino-100/60 bg-white hover:bg-vino-50')}>
           <p className="font-cond text-[11px] uppercase tracking-wider text-zinc-500">Revisión legal</p>
           <p className={cx('mt-1 flex items-center gap-2 text-xl font-semibold', errores ? 'text-red-700' : 'text-emerald-700')}>{errores ? <><AlertTriangle size={18} />{errores} {errores === 1 ? 'problema' : 'problemas'}</> : 'Todo correcto'}</p>
-          <p className="text-xs text-zinc-500">{avisos.length - errores} avisos · ver detalle</p>
+          <p className="text-xs text-zinc-500">{avisos.length - errores} avisos · {errores ? 'ver cómo arreglarlo' : 'ver detalle'}</p>
         </button>
       </div>
 
@@ -132,7 +140,7 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
           {config.plantillas.map((p) => (
             <Chip key={p.id} activo={pincel !== null && pincel !== 'borrar' && pincel.nombre === p.nombre} color={p.color} onClick={() => setPincel(pincel !== 'borrar' && pincel?.nombre === p.nombre ? null : { tipo: 'trabajo', tramos: p.tramos, nombre: p.nombre, color: p.color })}>{p.nombre}</Chip>
           ))}
-          {(['libre', 'vacaciones', 'baja', 'permiso'] as TipoTurno[]).map((k) => (
+          {(['flexible', 'libre', 'vacaciones', 'baja', 'permiso'] as TipoTurno[]).map((k) => (
             <Chip key={k} activo={pincel !== null && pincel !== 'borrar' && pincel.nombre === k} color={TIPOS[k].borde} onClick={() => setPincel(pincel !== 'borrar' && pincel?.nombre === k ? null : { tipo: k, tramos: [], nombre: k, color: TIPOS[k].borde })}>{TIPOS[k].label}</Chip>
           ))}
           <Chip activo={pincel === 'borrar'} color="#71717a" onClick={() => setPincel(pincel === 'borrar' ? null : 'borrar')}><Eraser size={13} />Borrar</Chip>
@@ -235,11 +243,13 @@ export default function Cuadrante({ editable }: { editable: boolean }) {
         <p className="mb-3 text-sm text-zinc-500">Comprobaciones según el Estatuto de los Trabajadores: máximo {config.max_horas_dia} h diarias, {config.descanso_min} h de descanso entre jornadas, descanso semanal y horas de contrato.</p>
         {!avisos.length && <p className="rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-800">Todo correcto esta semana.</p>}
         <ul className="space-y-2">
-          {avisos.map((a, i) => {
+          {[...avisos].sort((x, y) => NIVEL[x.nivel] - NIVEL[y.nivel]).map((a, i) => {
             const e = a.empleado_id ? ix.empleado(a.empleado_id) : undefined
             return (
               <li key={i} className={cx('flex items-start gap-3 rounded-xl p-3 text-sm', a.nivel === 'error' ? 'bg-red-50 text-red-800' : a.nivel === 'aviso' ? 'bg-amber-50 text-amber-900' : 'bg-zinc-50 text-zinc-700')}>
-                {e && <Avatar emp={e} size={26} />}<span><b>{e?.nombre}</b> · {a.texto}</span>
+                {e && <Avatar emp={e} size={26} />}
+                <div className="min-w-0 flex-1"><p><b>{e?.nombre}</b> · {a.texto}</p>{a.clave && <p className="mt-0.5 text-xs opacity-80">Cómo arreglarlo: {ARREGLO[a.clave]}</p>}</div>
+                {e && editable && a.clave !== 'pausa' && <button onClick={() => { setVerAvisos(false); setEdit({ emp: e, fecha: diaArreglo(a) }) }} className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-vino-700 shadow-sm ring-1 ring-vino-100 hover:bg-vino-50">Corregir</button>}
               </li>
             )
           })}
@@ -260,7 +270,7 @@ function Celda({ t, err }: { t: Turno; err?: boolean }) {
   const ti = TIPOS[t.tipo]
   return (
     <div className={cx('w-full rounded-lg border-l-4 px-2 py-1.5', err && 'ring-2 ring-red-400')} style={{ background: ti.bg, borderColor: ti.borde }}>
-      {t.tipo === 'trabajo' ? <>
+      {t.tipo === 'flexible' ? <><p className="text-[13px] font-semibold" style={{ color: ti.fg }}>Flexible</p><p className="text-[10px] tabular" style={{ color: ti.fg }}>{fmtH(minTurno(t))} · sin hora fija</p></> : t.tipo === 'trabajo' ? <>
         {t.tramos.map((x, i) => <p key={i} className="text-[13px] font-semibold leading-tight text-vino-900 tabular">{x.i}–{x.f}</p>)}
         <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-vino-700/70">{fmtH(minTurno(t))}{t.centro && ` · ${t.centro}`}{t.nota && <StickyNote size={10} className="shrink-0" />}</p>
       </> : <p className="text-[13px] font-semibold" style={{ color: ti.fg }}>{ti.label}</p>}

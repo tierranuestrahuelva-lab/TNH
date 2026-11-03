@@ -8,7 +8,8 @@ create table if not exists hor_empleados (
 create table if not exists hor_turnos (
   id text primary key, empleado_id text not null, fecha date not null,
   tipo text not null default 'trabajo', tramos jsonb not null default '[]'::jsonb,
-  centro text, nota text, updated_at timestamptz default now()
+  centro text, nota text, horas numeric,
+  updated_at timestamptz default now()
 );
 create index if not exists hor_turnos_fecha on hor_turnos(fecha);
 create table if not exists hor_fichajes (

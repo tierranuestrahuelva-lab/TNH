@@ -286,3 +286,56 @@ for (const [rol, vistas] of Object.entries(VISTAS)) {
     })
   }
 }
+
+test.describe('cuadrante', () => {
+  const turnoDe = async (page: Page, id: string) => (await estado(page)).turnos.find((x: { id: string }) => x.id === id)
+
+  test('[CUA-09] un problema del cuadrante se arregla desde «Corregir»', async ({ page, abrir }) => {
+    await abrir({ perfil: ENC, vista: 'cuadrante' })
+    await page.evaluate(() => {
+      const e = JSON.parse(localStorage.getItem('tn-hor-cache')!)
+      e.turnos.find((t: { id: string }) => t.id === 'ana_2026-11-12').tramos = [{ i: '08:00', f: '20:00' }]
+      localStorage.setItem('tn-hor-cache', JSON.stringify(e))
+    })
+    await page.goto('/?v=2#cuadrante')
+    await page.getByRole('button', { name: /Revisión legal/ }).click()
+    await expect(page.getByText(/Cómo arreglarlo: Acorta el turno/)).toBeVisible()
+    await page.getByRole('button', { name: 'Corregir' }).first().click()
+    const horas = page.locator('input[type="time"]')
+    await expect(horas.first()).toHaveValue('08:00')
+    await horas.nth(1).fill('14:00')
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    expect((await turnoDe(page, 'ana_2026-11-12')).tramos).toEqual([{ i: '08:00', f: '14:00' }])
+    await page.getByRole('button', { name: /Revisión legal/ }).click()
+    await expect(page.getByText(/Cómo arreglarlo: Acorta el turno/)).toHaveCount(0)
+  })
+
+  test('[CUA-10] jornada flexible: solo las horas del día, sin hora fija', async ({ page, abrir }) => {
+    await abrir({ perfil: ENC, vista: 'cuadrante' })
+    const fila = page.getByRole('row', { name: /Ana Pérez/ })
+    await fila.getByRole('button').nth(5).click()
+    await page.getByRole('button', { name: 'Jornada flexible', exact: true }).last().click()
+    await page.getByLabel('Horas de ese día').fill('5')
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    expect(await turnoDe(page, 'ana_2026-11-14')).toMatchObject({ tipo: 'flexible', horas: 5, tramos: [] })
+    await expect(fila).toContainText('sin hora fija')
+    await expect(fila).toContainText('25h / 40h')
+  })
+
+  test('[SAB-04] dependientas y repartidores se turnan cada uno en su rueda', async ({ page, abrir }) => {
+    await abrir({ perfil: ENC, vista: 'cuadrante' })
+    await page.getByRole('button', { name: 'Sábados alternos' }).click()
+    await page.getByLabel('Grupo').selectOption('Dependienta')
+    await page.getByRole('button', { name: 'Repartir sábados' }).click()
+    await page.getByRole('button', { name: 'Sábados alternos' }).click()
+    await expect(page.getByRole('button', { name: 'Dependienta', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '+ Nueva rueda' }).click()
+    await page.getByLabel('Grupo').selectOption('Repartidor/a')
+    await page.getByRole('button', { name: 'Repartir sábados' }).click()
+    const e = await estado(page)
+    expect(e.config.ruedas_sabados.map((r: { nombre: string; ids: string[] }) => [r.nombre, r.ids])).toEqual([['Dependienta', ['ana']], ['Repartidor/a', ['juan']]])
+    expect((await turnoDe(page, 'ana_2026-11-14'))?.tipo).toBe('trabajo')
+    expect((await turnoDe(page, 'juan_2026-11-14'))?.tipo).toBe('trabajo')
+    expect((await turnoDe(page, 'lucia_2026-11-14'))?.tipo).not.toBe('trabajo')
+  })
+})

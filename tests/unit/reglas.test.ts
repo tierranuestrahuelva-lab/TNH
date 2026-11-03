@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { avisosSemana, huecosCobertura, minTramo, minTurno, resumenFichajes } from '../../src/lib/reglas'
+import { ARREGLO, avisosSemana, huecosCobertura, minTramo, minTurno, resumenFichajes } from '../../src/lib/reglas'
 import { CONFIG_BASE } from '../../src/lib/config'
 import { semana } from '../../src/lib/fechas'
 import type { Empleado, Fichaje, Tramo, Turno } from '../../src/lib/types'
@@ -77,5 +77,23 @@ describe('fichajes', () => {
   })
   it('[FIC-04] una salida sin entrada no suma horas', () => {
     expect(resumenFichajes([fich('salida', '14:00')]).min).toBe(0)
+  })
+})
+
+describe('jornada flexible', () => {
+  const flex = (fecha: string, horas: number): Turno => ({ id: `ana_${fecha}`, empleado_id: 'ana', fecha, tipo: 'flexible', tramos: [], horas })
+  it('[CUA-10] cuenta horas y día trabajado, sin falsos avisos de descanso', () => {
+    expect(minTurno(flex('2026-11-09', 6.5))).toBe(390)
+    const dias = semana('2026-11-09')
+    const todos = avisos(dias.map((f) => flex(f, 5)))
+    expect(todos.some((a) => a.clave === 'libre')).toBe(true)
+    expect(todos.some((a) => a.clave === 'descanso' || a.clave === 'pausa')).toBe(false)
+    expect(avisos([flex('2026-11-10', 10)]).some((a) => a.clave === 'max' && a.fecha === '2026-11-10')).toBe(true)
+    expect(avisos([flex('2026-11-10', 7)])).toEqual([])
+  })
+  it('[CUA-09] cada aviso con remedio trae su explicación', () => {
+    const a = avisos(semana('2026-11-09').map((f) => turno(f, [{ i: '08:00', f: '20:00' }])))
+    expect(a.length).toBeGreaterThan(0)
+    for (const x of a) expect(x.clave && ARREGLO[x.clave]).toBeTruthy()
   })
 })

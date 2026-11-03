@@ -1,5 +1,5 @@
 export type Tramo = { i: string; f: string }
-export type TipoTurno = 'trabajo' | 'libre' | 'vacaciones' | 'baja' | 'permiso' | 'festivo' | 'formacion'
+export type TipoTurno = 'trabajo' | 'flexible' | 'libre' | 'vacaciones' | 'baja' | 'permiso' | 'festivo' | 'formacion'
 
 export interface Empleado {
   id: string
@@ -26,6 +26,7 @@ export interface Turno {
   tramos: Tramo[]
   centro?: string | null
   nota?: string | null
+  horas?: number | null
 }
 
 export type TipoFichaje = 'entrada' | 'pausa' | 'vuelta' | 'salida'
@@ -80,6 +81,8 @@ export interface Solicitud {
 export interface Plantilla { id: string; nombre: string; tramos: Tramo[]; color: string }
 export interface Festivo { fecha: string; nombre: string }
 export interface RuedaSabados {
+  id?: string
+  nombre?: string
   ids: string[]
   porSabado: number
   tramos: Tramo[]
@@ -92,6 +95,7 @@ export interface Config {
   centros: string[]
   puestos: string[]
   sabados?: RuedaSabados | null
+  ruedas_sabados?: RuedaSabados[] | null
   plantillas: Plantilla[]
   apertura: Record<number, Tramo[]> // 0 = lunes … 6 = domingo
   festivos: Festivo[]
