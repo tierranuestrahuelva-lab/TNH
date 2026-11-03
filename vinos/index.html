@@ -15,14 +15,49 @@
     <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://tierranuestra.es" />
-    <script type="module" crossorigin src="./assets/index-B1xwK2J8.js"></script>
+    <script type="module" crossorigin src="./assets/index-C9Ow9hWt.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-Dk72oS4N.js">
     <link rel="modulepreload" crossorigin href="./assets/chunk-OB3PAWPO-Dh_WOQhi.js">
     <link rel="modulepreload" crossorigin href="./assets/estilo-CIo2GkDR.js">
-    <link rel="modulepreload" crossorigin href="./assets/BottleArt-DZVEcL9n.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-BatZJP9q.css">
+    <link rel="modulepreload" crossorigin href="./assets/BottleArt-CPTiTo6g.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-AnLFuVRA.css">
+      <link rel="preload" as="fetch" crossorigin href="./catalog.json?v=mw1501bz">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main role="status" aria-label="Cargando Tierra Nuestra" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:32px;font-family:Arial,sans-serif;color:#302a2d;text-align:center">
+        <img src="./logo.svg" alt="Tierra Nuestra" width="172" height="64" style="object-fit:contain">
+        <span style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#830040">Casa de vinos · Huelva</span>
+        <span style="width:180px;height:3px;overflow:hidden;background:#eadfe5"><span style="display:block;width:40%;height:100%;background:#830040;animation:tn-load 1.5s ease-in-out infinite"></span></span>
+      </main>
+    </div>
+    <script>
+      (() => {
+        const key = 'tn-chunk-reload'
+        const showFailure = () => {
+          const root = document.getElementById('root')
+          if (!root) return
+          const logo = root.querySelector('img')?.src || new URL('logo.svg', document.baseURI).href
+          root.innerHTML = `<main style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;font-family:Arial,sans-serif;color:#302a2d;text-align:center"><img src="${logo}" alt="Tierra Nuestra" width="172" height="64" style="object-fit:contain"><h1 style="margin:0;font-family:Georgia,serif;font-size:32px;font-weight:500">No hemos podido cargar esta página</h1><button id="tn-load-retry" type="button" style="border:0;border-radius:999px;background:#830040;padding:13px 28px;color:white;font:inherit;cursor:pointer">Recargar</button></main>`
+          root.querySelector('#tn-load-retry')?.addEventListener('click', () => window.location.reload())
+        }
+        window.addEventListener('error', (event) => {
+          const script = event.target
+          if (!(script instanceof HTMLScriptElement) || script.type !== 'module') return
+          try {
+            if (sessionStorage.getItem(key)) {
+              showFailure()
+              return
+            }
+            sessionStorage.setItem(key, '1')
+            const url = new URL(window.location.href)
+            url.searchParams.set('__tn_chunk_retry', Date.now().toString())
+            window.location.replace(url.href)
+          } catch {
+            showFailure()
+          }
+        }, true)
+      })()
+    </script>
   </body>
 </html>
