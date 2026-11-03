@@ -1,6 +1,6 @@
 'use strict';
 /* TPV Tierra Nuestra — app de caja en el navegador. Datos en este dispositivo (IndexedDB + localStorage). */
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tpv_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
