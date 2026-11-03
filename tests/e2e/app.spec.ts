@@ -173,6 +173,33 @@ test.describe('ausencias', () => {
   })
 })
 
+test.describe('cambios de horario', () => {
+  test('[AUS-03][AUS-04] el empleado pide un cambio con observación → aprobado → cuadrante e historial', async ({ page, abrir }) => {
+    await abrir({ perfil: yo('ana'), vista: 'mihorario' })
+    await page.getByRole('button', { name: 'Pedir cambio del 2026-11-12' }).click()
+    await expect(page.getByText('Horario actual:')).toContainText('10:00–14:00')
+    await page.getByLabel('Entrada').fill('11:00')
+    await page.getByLabel('Salida').fill('15:00')
+    const enviar = page.getByRole('button', { name: 'Enviar' })
+    await expect(enviar).toBeDisabled()
+    await page.getByPlaceholder(/médico/).fill('Médico a primera hora')
+    await enviar.click()
+    await expect(page.getByText('Cambio enviado')).toBeVisible()
+    await expect(page.getByText('Cambio pedido · pendiente de aprobar')).toBeVisible()
+    let e = await estado(page)
+    expect(e.turnos.find((x: { id: string }) => x.id === 'ana_2026-11-12').tramos).toEqual([{ i: '10:00', f: '14:00' }])
+    await page.evaluate(() => localStorage.setItem('tn-hor-perfil', JSON.stringify({ rol: 'encargado' })))
+    await page.goto('/?v=2#ausencias')
+    await expect(page.getByText('Pide: 11:00–15:00')).toBeVisible()
+    await page.getByRole('button', { name: 'Aprobar' }).click()
+    await expect(page.getByText('Cambio aprobado y aplicado al cuadrante')).toBeVisible()
+    e = await estado(page)
+    expect(e.turnos.find((x: { id: string }) => x.id === 'ana_2026-11-12')).toMatchObject({ tipo: 'trabajo', tramos: [{ i: '11:00', f: '15:00' }] })
+    expect(e.solicitudes[0]).toMatchObject({ estado: 'aprobada', motivo: 'Médico a primera hora', turno_antes: { tipo: 'trabajo', tramos: [{ i: '10:00', f: '14:00' }] } })
+    await expect(page.getByText('10:00–14:00 → 11:00–15:00')).toBeVisible()
+  })
+})
+
 test.describe('datos', () => {
   test('[DAT-02] sin nube: trabaja solo en este dispositivo', async ({ page, abrir }, info) => {
     test.skip(info.project.name === 'movil', 'el aviso de sincronización está en el menú lateral de escritorio')

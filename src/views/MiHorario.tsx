@@ -1,4 +1,6 @@
-import { CalendarPlus, MessageCircle } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarPlus, MessageCircle, Pencil } from 'lucide-react'
+import { ModalCambio } from './Solicitudes'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
 import type { Empleado, Turno } from '../lib/types'
@@ -8,7 +10,9 @@ import { ics, whatsapp } from '../lib/exportar'
 import { Barra, Boton, Tarjeta, cx } from '../ui'
 
 export default function MiHorario({ emp }: { emp: Empleado }) {
-  const { turnos } = useDatos()
+  const { turnos, solicitudes } = useDatos()
+  const [cambio, setCambio] = useState<string | null>(null)
+  const pedido = (d: string) => solicitudes.some((s) => s.empleado_id === emp.id && s.tipo === 'cambio' && s.estado === 'pendiente' && s.desde === d)
   const ix = useIndices()
   const f = hoy()
   const semanas = [0, 1, 2, 3].map((k) => semana(sumarDias(lunesDe(f), 7 * k)))
@@ -45,14 +49,17 @@ export default function MiHorario({ emp }: { emp: Empleado }) {
                       : t.tipo === 'trabajo' ? <><p className="font-semibold tabular">{textoTramos(t.tramos)}</p><p className={cx('truncate text-xs', d === f ? 'text-lila-100' : 'text-zinc-500')}>{fmtH(minTurno(t))}{t.centro && ` · ${t.centro}`}{t.nota && ` · ${t.nota}`}</p></>
                       : <span className="inline-flex rounded-full px-2.5 py-0.5 text-sm font-medium" style={{ background: ti!.bg, color: ti!.fg }}>{ti!.label}</span>}
                     {fest && <p className={cx('text-xs', d === f ? 'text-white' : 'text-blue-700')}>Festivo: {fest}</p>}
+                    {pedido(d) && <p className={cx('text-xs font-medium', d === f ? 'text-white' : 'text-amber-700')}>Cambio pedido · pendiente de aprobar</p>}
                   </div>
+                  {d >= f && <button type="button" aria-label={`Pedir cambio del ${d}`} onClick={() => setCambio(d)} className={cx('flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium', d === f ? 'text-white hover:bg-white/10' : 'text-vino-700 hover:bg-vino-100')}><Pencil size={14} /><span className="hidden sm:inline">Cambiar</span></button>}
                 </li>
               )
             })}
           </ul>
         </Tarjeta>
       ))}
-      <p className="text-center text-xs text-zinc-400">Los cambios del encargado aparecen aquí al momento · {MESES[new Date().getMonth()]}</p>
+      <ModalCambio emp={emp} fecha={cambio} onCerrar={() => setCambio(null)} />
+      <p className="text-center text-xs text-zinc-400">Toca el lápiz de un día para pedir un cambio con una observación. Los cambios del encargado aparecen aquí al momento · {MESES[new Date().getMonth()]}</p>
     </div>
   )
 }

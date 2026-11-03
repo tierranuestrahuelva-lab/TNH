@@ -54,6 +54,8 @@ lados en un móvil.
 ## AUS · Ausencias y solicitudes
 - **AUS-01** El empleado envía una solicitud y queda «pendiente».
 - **AUS-02** Al aprobar vacaciones/permiso/baja se marca cada día natural en el cuadrante.
+- **AUS-03** El empleado pide un cambio de horario de un día (nuevo horario o día libre) con observación obligatoria; queda «pendiente» y su horario no cambia hasta que se apruebe.
+- **AUS-04** Al aprobar un cambio de horario se aplica al cuadrante y la solicitud guarda el horario anterior y la observación (historial).
 
 ## GEO · Ubicación al fichar
 - **GEO-01** Solo se pide ubicación a los puestos configurados (por defecto Repartidor/a y Comercial).

@@ -8,6 +8,7 @@ import { TIPOS } from '../lib/reglas'
 import { toast } from '../lib/toast'
 import { Avatar, Barra, Boton, Campo, Modal, Tarjeta, Vacio, cx, input } from '../ui'
 import { ESTADO, TIPOS_SOL } from './Solicitudes'
+import { aplicarCambio, esCambioHorario, horarioPedido, textoHorario } from '../lib/cambios'
 import { Palmtree } from 'lucide-react'
 
 export default function Ausencias() {
@@ -25,7 +26,14 @@ export default function Ausencias() {
     guardar('turnos', rango(desde, hasta).map((f): Turno => ({ id: turnoId(emp, f), empleado_id: emp, fecha: f, tipo, tramos: [], centro: null, nota: nota || null })))
   }
   const decidir = (s: Solicitud, estado: 'aprobada' | 'rechazada') => {
-    guardar('solicitudes', { ...s, estado, respuesta: resp[s.id] || null, updated_at: new Date().toISOString() })
+    const fila = { ...s, estado, respuesta: resp[s.id] || null, updated_at: new Date().toISOString() }
+    if (estado === 'aprobada' && esCambioHorario(s)) {
+      const { turno, turno_antes } = aplicarCambio(s, ix.turnoDe(s.empleado_id, s.desde))
+      guardar('turnos', turno)
+      guardar('solicitudes', { ...fila, turno_antes })
+      return toast('Cambio aprobado y aplicado al cuadrante')
+    }
+    guardar('solicitudes', fila)
     if (estado === 'aprobada' && s.tipo !== 'cambio' && s.tipo !== 'otro') ponerAusencia(s.empleado_id, s.tipo as TipoTurno, s.desde, s.hasta, s.motivo || undefined)
     toast(estado === 'aprobada' ? 'Aprobada y añadida al cuadrante' : 'Solicitud rechazada')
   }
@@ -49,7 +57,8 @@ export default function Ausencias() {
                     <Avatar emp={e} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-zinc-800">{e?.nombre} · <span className="text-vino-700">{TIPOS_SOL[s.tipo]}</span></p>
-                      <p className="text-sm text-zinc-600">{s.desde === s.hasta ? fechaCorta(s.desde) : `${fechaCorta(s.desde)} – ${fechaCorta(s.hasta)}`} · {rango(s.desde, s.hasta).length} días</p>
+                      <p className="text-sm text-zinc-600">{s.desde === s.hasta ? fechaCorta(s.desde) : `${fechaCorta(s.desde)} – ${fechaCorta(s.hasta)}`}{!esCambioHorario(s) && ` · ${rango(s.desde, s.hasta).length} días`}</p>
+                      {esCambioHorario(s) && <p className="mt-1 text-sm">Ahora: <span className="tabular text-zinc-600">{textoHorario(ix.turnoDe(s.empleado_id, s.desde))}</span> → Pide: <b className="tabular text-vino-800">{textoHorario(horarioPedido(s))}</b></p>}
                       {s.motivo && <p className="mt-1 text-sm text-zinc-600">«{s.motivo}»</p>}
                       {sol.length > 0 && <p className="mt-1 text-sm font-medium text-amber-700">Coincide con la ausencia de {sol.map((x) => x.nombre.split(' ')[0]).join(', ')}</p>}
                     </div>
@@ -102,7 +111,7 @@ export default function Ausencias() {
         <Tarjeta titulo="Historial de solicitudes">
           <ul className="divide-y divide-vino-50">
             {hist.map((s) => { const e = ix.empleado(s.empleado_id); return (
-              <li key={s.id} className="flex items-center gap-3 py-2.5 text-sm"><Avatar emp={e} size={28} /><span className="flex-1"><b>{e?.nombre}</b> · {TIPOS_SOL[s.tipo]} · {fechaCorta(s.desde)}{s.hasta !== s.desde && ` – ${fechaCorta(s.hasta)}`}</span><span className={cx('rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize', ESTADO[s.estado])}>{s.estado}</span></li>) })}
+              <li key={s.id} className="flex items-center gap-3 py-2.5 text-sm"><Avatar emp={e} size={28} /><span className="min-w-0 flex-1"><b>{e?.nombre}</b> · {TIPOS_SOL[s.tipo]} · {fechaCorta(s.desde)}{s.hasta !== s.desde && ` – ${fechaCorta(s.hasta)}`}{esCambioHorario(s) && <span className="block text-xs text-zinc-500">{s.turno_antes !== undefined && s.estado === 'aprobada' ? `${textoHorario(s.turno_antes)} → ` : 'Pedía '}{textoHorario(horarioPedido(s))}{s.motivo && ` · «${s.motivo}»`}</span>}</span><span className={cx('rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize', ESTADO[s.estado])}>{s.estado}</span></li>) })}
           </ul>
         </Tarjeta>
       )}

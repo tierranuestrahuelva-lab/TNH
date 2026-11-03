@@ -72,6 +72,8 @@ export interface Solicitud {
   estado: EstadoSolicitud
   respuesta?: string | null
   created_at?: string
+  tramos?: Tramo[] | null
+  turno_antes?: { tipo: TipoTurno; tramos: Tramo[] } | null
 }
 
 export interface Plantilla { id: string; nombre: string; tramos: Tramo[]; color: string }
