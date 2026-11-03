@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, MapPin, CalendarRange, Clock, Coffee, LogIn,
 import { useDatos } from '../lib/datos'
 import { diasDesdeCopia } from '../lib/copia'
 import { avisoFichaje, flexible, mapa } from '../lib/geo'
+import { enlaceWhatsApp, jornadasAbiertas, olvidoPendiente } from '../lib/olvidos'
 import { CopiaSeguridad } from './Ajustes'
 import { useIndices } from '../lib/usar'
 import { rango, aMin, fechaCorta, fechaLarga, fmtH, horaDe, hoy, lunesDe, semana, sumarDias, diaSemana, deIso } from '../lib/fechas'
@@ -42,6 +43,8 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
   const manana = sumarDias(f, 1)
 
   const diasCopia = diasDesdeCopia(config.ultima_copia)
+  const abiertas = ix.activos.flatMap((e) => jornadasAbiertas(e.id, ix.fichajesDe, f).map((dia) => ({ e, dia, ultima: ix.fichajesDe(e.id, dia).slice(-1)[0], pedido: olvidoPendiente(solicitudes, e.id, dia, 'salida') })))
+  const recordar = (e: { nombre: string; telefono?: string | null }, txt: string) => e.telefono ? <a href={enlaceWhatsApp(e.telefono, `Hola ${e.nombre.split(' ')[0]}, ${txt}`)} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-50">Avisar por WhatsApp</a> : null
   const fueraZona = rango(sumarDias(f, -6), f).reverse().flatMap((d) => ix.activos.flatMap((e) => ix.fichajesDe(e.id, d).map((x) => ({ d, e, x, a: avisoFichaje(e, config, x, ix.turnoDe(e.id, d)) })).filter((y) => y.a)))
   return (
     <div className="space-y-6">
@@ -89,6 +92,20 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
         </Tarjeta>
       )}
 
+      {abiertas.length > 0 && (
+        <Tarjeta titulo={<span className="flex items-center gap-2 text-red-700"><AlertTriangle size={16} />Jornadas sin cerrar · últimos 7 días</span>} accion={<button onClick={() => ir('fichajes')} className="text-sm text-vino-600 hover:underline">Registro</button>}>
+          <ul className="divide-y divide-vino-50">
+            {abiertas.slice(0, 8).map(({ e, dia, ultima, pedido }) => (
+              <li key={e.id + dia} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                <Avatar emp={e} size={32} />
+                <div className="min-w-0 flex-1"><p className="truncate"><b>{e.nombre}</b> · {fechaCorta(dia)} · no fichó la salida</p><p className="truncate text-zinc-500">Último fichaje: {ultima.tipo === 'pausa' ? 'pausa' : 'entrada'} a las {horaDe(ultima.ts)}</p></div>
+                {pedido ? <button onClick={() => ir('ausencias')} className="shrink-0 rounded-lg px-2 py-1 font-medium text-lila-600 hover:bg-lila-50">Ha pedido corrección</button> : recordar(e, `el ${fechaCorta(dia)} no fichaste la salida. Entra en la app de horarios y pulsa «Indicar mi hora de salida».`)}
+              </li>
+            ))}
+          </ul>
+        </Tarjeta>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-3">
         <Tarjeta titulo="Equipo ahora" className="xl:col-span-2" accion={<button onClick={() => ir('fichajes')} className="text-sm text-vino-600 hover:underline">Registro de jornada</button>}>
           <ul className="divide-y divide-vino-50">
@@ -104,6 +121,7 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
                   {r.estado === 'pausa' && <p className="font-medium text-amber-700">En pausa</p>}
                   {r.estado === 'fuera' && r.primera && <p className="font-medium text-zinc-500">Ha salido</p>}
                   {tarde && <p className="font-medium text-red-600">No ha fichado</p>}
+                  {tarde && recordar(e, 'tu turno ya ha empezado y no has fichado la entrada. ¡No te olvides de fichar!')}
                   {r.primera && <p className="text-xs text-zinc-500 tabular">desde {horaDe(r.primera.ts)} · {fmtH(r.min)}</p>}
                 </div>
               </li>

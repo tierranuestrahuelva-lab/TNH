@@ -60,7 +60,7 @@ export interface HistFichaje {
   cuando: string
 }
 
-export type TipoSolicitud = 'vacaciones' | 'permiso' | 'cambio' | 'baja' | 'otro'
+export type TipoSolicitud = 'vacaciones' | 'permiso' | 'cambio' | 'baja' | 'fichaje' | 'otro'
 export type EstadoSolicitud = 'pendiente' | 'aprobada' | 'rechazada'
 export interface Solicitud {
   id: string
@@ -74,6 +74,7 @@ export interface Solicitud {
   created_at?: string
   tramos?: Tramo[] | null
   turno_antes?: { tipo: TipoTurno; tramos: Tramo[] } | null
+  fichaje?: { tipo: TipoFichaje; hora: string; id?: string } | null
 }
 
 export interface Plantilla { id: string; nombre: string; tramos: Tramo[]; color: string }

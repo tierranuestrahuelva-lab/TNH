@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Plus, Send, Trash2 } from 'lucide-react'
 import { useDatos } from '../lib/datos'
-import type { Empleado, Solicitud, TipoSolicitud, Tramo } from '../lib/types'
+import type { Empleado, Solicitud, TipoFichaje, TipoSolicitud, Tramo } from '../lib/types'
+import { DIAS_OLVIDO, NOMBRE_FICHAJE, SIN_MOTIVO, errorOlvido, esOlvido, textoOlvido } from '../lib/olvidos'
 import { useIndices } from '../lib/usar'
 import { esCambioHorario, horarioPedido, textoHorario, tramosValidos } from '../lib/cambios'
-import { fechaCorta, hoy, rango, uid } from '../lib/fechas'
+import { fechaCorta, horaDe, hoy, rango, sumarDias, uid } from '../lib/fechas'
 import { toast } from '../lib/toast'
 import { Boton, Campo, Modal, Tarjeta, Vacio, cx, input } from '../ui'
 import { Inbox } from 'lucide-react'
 
-export const TIPOS_SOL: Record<TipoSolicitud, string> = { vacaciones: 'Vacaciones', permiso: 'Permiso / asuntos propios', cambio: 'Cambio de horario', baja: 'Baja médica', otro: 'Otro' }
+export const TIPOS_SOL: Record<TipoSolicitud, string> = { vacaciones: 'Vacaciones', permiso: 'Permiso / asuntos propios', cambio: 'Cambio de horario', baja: 'Baja médica', fichaje: 'Fichaje olvidado', otro: 'Otro' }
 export const ESTADO: Record<string, string> = { pendiente: 'bg-amber-50 text-amber-800', aprobada: 'bg-emerald-50 text-emerald-800', rechazada: 'bg-red-50 text-red-700' }
 
 export default function Solicitudes({ emp }: { emp: Empleado }) {
   const { solicitudes, guardar } = useDatos()
   const [nueva, setNueva] = useState(false)
   const [cambio, setCambio] = useState<string | null>(null)
+  const [olvido, setOlvido] = useState<DatosOlvido | null>(null)
   const [s, setS] = useState({ tipo: 'vacaciones' as TipoSolicitud, desde: hoy(), hasta: hoy(), motivo: '' })
   const mias = solicitudes.filter((x) => x.empleado_id === emp.id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
   const enviar = () => {
@@ -28,6 +30,7 @@ export default function Solicitudes({ emp }: { emp: Empleado }) {
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="flex items-end justify-between"><h1 className="text-2xl font-semibold text-vino-900">Mis solicitudes</h1><Boton onClick={() => setNueva(true)}><Plus size={16} />Nueva</Boton></div>
       <ModalCambio emp={emp} fecha={cambio} onCerrar={() => setCambio(null)} />
+      <ModalOlvido emp={emp} datos={olvido} onCerrar={() => setOlvido(null)} />
       <Tarjeta>
         {!mias.length ? <Vacio icono={<Inbox size={28} />} titulo="Sin solicitudes" texto="Pide vacaciones, un permiso o un cambio de horario. Tu encargado/a lo verá al momento." /> : (
           <ul className="divide-y divide-vino-50">
@@ -35,7 +38,7 @@ export default function Solicitudes({ emp }: { emp: Empleado }) {
               <li key={x.id} className="flex items-start gap-3 p-4">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-zinc-800">{TIPOS_SOL[x.tipo]}</p>
-                  <p className="text-sm text-zinc-500">{x.desde === x.hasta ? fechaCorta(x.desde) : `${fechaCorta(x.desde)} – ${fechaCorta(x.hasta)}`}{esCambioHorario(x) ? <> · pides <b className="text-zinc-700">{textoHorario(horarioPedido(x))}</b></> : ` · ${rango(x.desde, x.hasta).length} días`}</p>
+                  <p className="text-sm text-zinc-500">{x.desde === x.hasta ? fechaCorta(x.desde) : `${fechaCorta(x.desde)} – ${fechaCorta(x.hasta)}`}{esCambioHorario(x) ? <> · pides <b className="text-zinc-700">{textoHorario(horarioPedido(x))}</b></> : esOlvido(x) ? <> · <b className="text-zinc-700">{textoOlvido(x)}</b></> : ` · ${rango(x.desde, x.hasta).length} días`}</p>
                   {x.turno_antes && <p className="text-xs text-zinc-500">Antes: {textoHorario(x.turno_antes)}</p>}
                   {x.motivo && <p className="mt-1 text-sm text-zinc-600">«{x.motivo}»</p>}
                   {x.respuesta && <p className="mt-1 text-sm text-vino-700">Respuesta: {x.respuesta}</p>}
@@ -48,7 +51,7 @@ export default function Solicitudes({ emp }: { emp: Empleado }) {
       </Tarjeta>
       <Modal abierto={nueva} onCerrar={() => setNueva(false)} titulo="Nueva solicitud" pie={<><Boton tipo="secundario" onClick={() => setNueva(false)}>Cancelar</Boton><Boton onClick={enviar}><Send size={16} />Enviar</Boton></>}>
         <div className="space-y-4">
-          <Campo label="Tipo"><select className={input} value={s.tipo} onChange={(e) => { const tipo = e.target.value as TipoSolicitud; if (tipo === 'cambio') { setNueva(false); setCambio(s.desde) } else setS({ ...s, tipo }) }}>{Object.entries(TIPOS_SOL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
+          <Campo label="Tipo"><select className={input} value={s.tipo} onChange={(e) => { const tipo = e.target.value as TipoSolicitud; if (tipo === 'cambio') { setNueva(false); setCambio(s.desde) } else if (tipo === 'fichaje') { setNueva(false); setOlvido({ fecha: hoy(), tipo: 'salida', hora: '' }) } else setS({ ...s, tipo }) }}>{Object.entries(TIPOS_SOL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Desde"><input type="date" className={input} value={s.desde} onChange={(e) => setS({ ...s, desde: e.target.value, hasta: s.hasta < e.target.value ? e.target.value : s.hasta })} /></Campo>
             <Campo label="Hasta"><input type="date" className={input} value={s.hasta} min={s.desde} onChange={(e) => setS({ ...s, hasta: e.target.value })} /></Campo>
@@ -107,6 +110,39 @@ export function ModalCambio({ emp, fecha, onCerrar }: { emp: Empleado; fecha: st
         </div>
         <Campo label="Observación (obligatoria)"><textarea rows={3} className={input} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: entro a las 11 porque tengo médico a primera hora" /></Campo>
         <p className="text-xs text-zinc-500">Tu horario no cambia hasta que el encargado/a lo apruebe.</p>
+      </div>
+    </Modal>
+  )
+}
+
+export type DatosOlvido = { fecha: string; tipo: TipoFichaje; hora: string; aviso?: string; cancelar?: string }
+
+export function ModalOlvido({ emp, datos, onCerrar }: { emp: Empleado; datos: DatosOlvido | null; onCerrar: () => void }) {
+  const { guardar, solicitudes } = useDatos()
+  const ix = useIndices()
+  const [o, setO] = useState({ fecha: hoy(), tipo: 'salida' as TipoFichaje, hora: '', motivo: '' })
+  useEffect(() => { if (datos) setO({ fecha: datos.fecha, tipo: datos.tipo, hora: datos.hora, motivo: '' }) }, [datos])
+  const fsDia = ix.fichajesDe(emp.id, o.fecha)
+  const err = errorOlvido(o, fsDia, solicitudes.filter((s) => s.empleado_id === emp.id))
+  const enviar = () => {
+    const fila: Solicitud = { id: uid(), empleado_id: emp.id, tipo: 'fichaje', desde: o.fecha, hasta: o.fecha, motivo: o.motivo.trim(), fichaje: { tipo: o.tipo, hora: o.hora }, estado: 'pendiente', created_at: new Date().toISOString() }
+    guardar('solicitudes', fila)
+    onCerrar()
+    toast('Corrección enviada al encargado/a para que la apruebe')
+  }
+  return (
+    <Modal abierto={!!datos} onCerrar={onCerrar} titulo="Fichaje olvidado" pie={<><Boton tipo="secundario" onClick={onCerrar}>{datos?.cancelar || 'Cancelar'}</Boton><Boton disabled={!!err} onClick={enviar}><Send size={16} />Enviar</Boton></>}>
+      <div className="space-y-4">
+        {datos?.aviso && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">{datos.aviso}</p>}
+        <Campo label="¿Qué se te olvidó fichar?"><select className={input} value={o.tipo} onChange={(e) => setO({ ...o, tipo: e.target.value as TipoFichaje })}>{Object.entries(NOMBRE_FICHAJE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Día"><input type="date" className={input} value={o.fecha} max={hoy()} min={sumarDias(hoy(), -DIAS_OLVIDO)} onChange={(e) => setO({ ...o, fecha: e.target.value })} /></Campo>
+          <Campo label="Hora real"><input type="time" aria-label="Hora real" className={cx(input, 'tabular')} value={o.hora} onChange={(e) => setO({ ...o, hora: e.target.value })} /></Campo>
+        </div>
+        <p className="rounded-xl bg-vino-50/60 px-3 py-2 text-sm text-zinc-600">Fichajes de ese día: <b className="tabular text-vino-900">{fsDia.length ? fsDia.map((f) => `${NOMBRE_FICHAJE[f.tipo]} ${horaDe(f.ts)}`).join(' · ') : 'ninguno'}</b></p>
+        <Campo label="Motivo (obligatorio)"><textarea rows={3} className={input} value={o.motivo} onChange={(e) => setO({ ...o, motivo: e.target.value })} placeholder="Ej.: se me olvidó fichar al terminar el último reparto" /></Campo>
+        {err && err !== SIN_MOTIVO && <p className="text-sm font-medium text-red-600">{err}</p>}
+        <p className="text-xs text-zinc-500">Tu registro no cambia hasta que el encargado/a lo apruebe. Quedará marcado como corrección pedida por ti.</p>
       </div>
     </Modal>
   )

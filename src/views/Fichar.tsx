@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { ChevronRight, Coffee, LogIn, LogOut, MapPin, Play, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, BellRing, ChevronRight, Coffee, History, LogIn, LogOut, MapPin, Play, ShieldCheck } from 'lucide-react'
+import { esOlvido, jornadasAbiertas, olvidoPendiente, recordatorio, textoOlvido } from '../lib/olvidos'
+import { ModalOlvido, type DatosOlvido } from './Solicitudes'
 import { alertaGeo, controlaHora, tieneGeo, textoGeo, ubicarFichaje, usaGeo, type DatosGeo } from '../lib/geo'
 import { privacidadLeida } from '../lib/config'
 import { useDatos } from '../lib/datos'
@@ -14,7 +16,7 @@ import { useAhora } from './Hoy'
 const NOMBRE: Record<TipoFichaje, string> = { entrada: 'Entrada', pausa: 'Inicio de pausa', vuelta: 'Fin de pausa', salida: 'Salida' }
 
 export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) => void }) {
-  const { guardar, config } = useDatos()
+  const { guardar, config, solicitudes } = useDatos()
   const geo = usaGeo(emp, config)
   const [ubicando, setUbicando] = useState(false)
   const ix = useIndices()
@@ -28,6 +30,15 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
   const sem = semana(lunesDe(f))
   const trabSem = sem.reduce((s, x) => s + minutosDia(ix.fichajesDe(emp.id, x), x, ahora), 0)
   const planSem = sem.reduce((s, x) => s + minTurno(ix.turnoDe(emp.id, x)), 0)
+  const [olvido, setOlvido] = useState<(DatosOlvido & { luego?: TipoFichaje }) | null>(null)
+  const rec0 = recordatorio(emp, config, t, fs, ahora)
+  const rec = rec0 && !olvidoPendiente(solicitudes, emp.id, f, rec0.tipo) ? rec0 : null
+  const abiertas = jornadasAbiertas(emp.id, ix.fichajesDe, f).filter((x) => !olvidoPendiente(solicitudes, emp.id, x, 'salida'))
+  const pendHoy = solicitudes.filter((s) => esOlvido(s) && s.estado === 'pendiente' && s.empleado_id === emp.id && s.desde === f)
+  const finDe = (x: string) => { const tt = ix.turnoDe(emp.id, x); return tt?.tipo === 'trabajo' && tt.tramos.length ? tt.tramos[tt.tramos.length - 1].f : '' }
+  const pedirSalida = (luego?: TipoFichaje) => setOlvido({ fecha: abiertas[0], tipo: 'salida', hora: finDe(abiertas[0]), luego, cancelar: luego ? 'Ahora no' : undefined, aviso: luego ? `Antes de fichar: el ${fechaLarga(abiertas[0]).toLowerCase()} no fichaste la salida. ¿A qué hora saliste?` : undefined })
+  const pedirFichar = (tipo: TipoFichaje) => (tipo === 'entrada' && abiertas.length ? pedirSalida('entrada') : setConfirmar(tipo))
+  const cerrarOlvido = () => { const l = olvido?.luego; setOlvido(null); if (l) setConfirmar(l) }
 
   const fichar = async (tipo: TipoFichaje) => {
     const ts = new Date().toISOString()
@@ -52,8 +63,26 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         <p className="mt-3 text-sm text-lila-100">Hoy llevas <b className="text-white tabular">{fmtH(r.min)}</b> · Tu turno: <b className="text-white">{!t ? 'sin turno' : t.tipo === 'trabajo' ? textoTramos(t.tramos) : TIPOS[t.tipo].label}</b></p>
       </div>
 
+      {abiertas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <AlertTriangle className="shrink-0 text-red-600" />
+          <p className="min-w-0 flex-1 basis-56"><b>El {fechaLarga(abiertas[0]).toLowerCase()} no fichaste la salida.</b> Indica a qué hora saliste para que el encargado/a lo corrija.</p>
+          <button onClick={() => pedirSalida()} className="w-full rounded-xl bg-red-600 px-4 py-2.5 font-semibold text-white sm:w-auto">Indicar mi hora de salida</button>
+        </div>
+      )}
+      {rec && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <BellRing className="shrink-0 text-amber-600 latido" />
+          <p className="min-w-0 flex-1 basis-56">{rec.tipo === 'entrada' ? <><b>Tu turno empezó a las {rec.hora}</b> y no consta tu entrada. ¿Se te ha olvidado fichar?</> : <><b>Tu turno terminó a las {rec.hora}</b> y sigues con la jornada abierta. ¿Se te ha olvidado fichar la salida?</>}</p>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <button onClick={() => pedirFichar(rec.tipo)} className="flex-1 rounded-xl bg-amber-600 px-4 py-2 font-semibold text-white">Fichar ahora</button>
+            <button onClick={() => setOlvido({ fecha: f, tipo: rec.tipo, hora: rec.hora })} className="flex-1 rounded-xl border border-amber-300 bg-white px-4 py-2 font-medium text-amber-800">Pedir corrección</button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        {r.estado === 'fuera' && <BotonGrande className="col-span-2 bg-emerald-600 hover:bg-emerald-700" icono={<LogIn size={28} />} t={r.primera ? 'Volver a entrar' : 'Fichar entrada'} onClick={() => setConfirmar('entrada')} />}
+        {r.estado === 'fuera' && <BotonGrande className="col-span-2 bg-emerald-600 hover:bg-emerald-700" icono={<LogIn size={28} />} t={r.primera ? 'Volver a entrar' : 'Fichar entrada'} onClick={() => pedirFichar('entrada')} />}
         {r.estado === 'dentro' && <>
           <BotonGrande className="bg-amber-500 hover:bg-amber-600" icono={<Coffee size={28} />} t="Pausa" onClick={() => setConfirmar('pausa')} />
           <BotonGrande className="bg-vino-600 hover:bg-vino-700" icono={<LogOut size={28} />} t="Fichar salida" onClick={() => setConfirmar('salida')} />
@@ -96,11 +125,17 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         )}
       </Tarjeta>
 
+      {pendHoy.length > 0 && <div className="rounded-2xl bg-lila-50 p-4 text-sm text-lila-600">{pendHoy.map((s) => <p key={s.id}>Pendiente de aprobar: <b>{textoOlvido(s)}</b></p>)}</div>}
+      <button onClick={() => setOlvido({ fecha: f, tipo: r.estado === 'fuera' && !r.primera ? 'entrada' : 'salida', hora: '' })} className="flex w-full items-center gap-3 rounded-2xl border border-vino-100 bg-white p-4 text-left text-sm text-vino-800 shadow-suave">
+        <History className="shrink-0" /><span className="flex-1"><b>¿Se te olvidó fichar?</b> Indica la hora real y el encargado/a lo aprobará.</span><ChevronRight size={18} />
+      </button>
+      <ModalOlvido emp={emp} datos={olvido} onCerrar={cerrarOlvido} />
+
       <Tarjeta titulo="Esta semana">
         <div className="mb-2 flex justify-between text-sm"><span>Trabajado <b className="tabular">{fmtH(trabSem)}</b></span><span className="text-zinc-500">Previsto {fmtH(planSem)} · Contrato {emp.horas_semana} h</span></div>
         <Barra valor={trabSem} max={Math.max(planSem, 1)} color={emp.color || undefined} />
       </Tarjeta>
-      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si te equivocas, avisa a tu encargado/a para corregirlo.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}{controlaHora(emp, config) && ' Ficha la salida en cuanto termines, estés donde estés (último reparto, casa o tienda).'}</p>
+      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si se te olvida fichar, pide la corrección desde aquí: nadie puede cambiar un fichaje sin dejar constancia.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}{controlaHora(emp, config) && ' Ficha la salida en cuanto termines, estés donde estés (último reparto, casa o tienda).'}</p>
     </div>
   )
 }

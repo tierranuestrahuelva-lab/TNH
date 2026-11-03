@@ -57,6 +57,13 @@ lados en un móvil.
 - **AUS-03** El empleado pide un cambio de horario de un día (nuevo horario o día libre) con observación obligatoria; queda «pendiente» y su horario no cambia hasta que se apruebe.
 - **AUS-04** Al aprobar un cambio de horario se aplica al cuadrante y la solicitud guarda el horario anterior y la observación (historial).
 
+## OLV · Fichajes olvidados y recordatorios
+- **OLV-01** El trabajador pide añadir un fichaje olvidado (qué fichaje, día, hora real y motivo obligatorio). No se puede pedir una hora futura, de hace más de un mes, ni una salida anterior a la entrada. Queda «pendiente» y su registro no cambia.
+- **OLV-02** Al aprobarla se añade el fichaje al registro marcado como corrección «a petición del trabajador», con el motivo y la fecha; al rechazarla no se añade nada.
+- **OLV-03** Si un día de la última semana quedó sin fichar la salida, el trabajador ve el aviso y, al fichar la entrada, la app le pide primero la hora de salida (puede dejarlo para luego). El encargado/a lo ve en «Hoy» como «Jornadas sin cerrar».
+- **REC-01** Si su turno empezó hace 5 minutos o más y no ha fichado, el trabajador ve «Tu turno empezó a las…» con «Fichar ahora» y «Pedir corrección». Los puestos con horario libre no reciben este aviso.
+- **REC-02** Si su turno terminó hace más de `margen_salida` minutos y sigue con la jornada abierta, ve «Tu turno terminó a las…».
+
 ## GEO · Ubicación al fichar
 - **GEO-01** Solo se pide ubicación a los puestos configurados (por defecto Repartidor/a y Comercial).
 - **GEO-02** Dentro del radio del sitio de trabajo → «En Almacén».
