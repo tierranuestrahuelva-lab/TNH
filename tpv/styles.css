@@ -110,7 +110,7 @@ label.chk input{width:20px;height:20px;accent-color:var(--vino)}
 /* cobro */
 .cobro{display:grid;grid-template-columns:1fr 300px;gap:16px}
 .cobro .tot{font-size:44px;font-weight:600;color:var(--vino);line-height:1}
-.formas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.formas{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
 .formas button{border:2px solid var(--linea);border-radius:14px;padding:14px 6px;font-weight:600;font-size:17px;background:#fff}
 .formas button.on{border-color:var(--vino);background:var(--lila2);color:var(--vino)}
 .display{font-size:34px;font-weight:600;text-align:right;border:2px solid var(--linea);border-radius:14px;padding:8px 14px;margin-bottom:8px;min-height:60px}
@@ -148,4 +148,53 @@ label.chk input{width:20px;height:20px;accent-color:var(--vino)}
  .cobro{grid-template-columns:1fr}
  .top .info{display:none}
  .top img{height:26px}
+}
+/* iconos y extras móviles */
+.ico{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.ico svg{width:22px;height:22px;flex-shrink:0}
+.btn.ico-only{padding:0;width:50px}
+.mbar{display:none}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow:auto;padding:2px}
+.chat .yo{align-self:flex-end;background:var(--vino);color:#fff;border-radius:14px 14px 2px 14px;padding:8px 12px;max-width:85%}
+.chat .ia{align-self:flex-start;background:var(--lila2);border-radius:14px 14px 14px 2px;padding:10px 12px;max-width:100%}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chips button{padding:7px 12px;border-radius:99px;border:1.5px solid var(--linea);background:#fff;font-size:14px}
+.sug{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px}
+.sug .prod{min-height:96px}
+.ask{display:flex;gap:8px;margin-top:10px}
+.ask input{flex:1;min-width:0;font-size:16px;padding:12px;border:1.5px solid var(--linea);border-radius:12px}
+.cam-box{position:relative}
+.cam-box video{width:100%;border-radius:12px;background:#000;display:block;max-height:60vh;object-fit:cover}
+.cam-box .mira{position:absolute;left:12%;right:12%;top:30%;bottom:30%;border:3px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.25);pointer-events:none}
+.cam-log{font-size:14px;margin-top:8px;max-height:110px;overflow:auto}
+.cam-log div{padding:4px 0;border-bottom:1px solid var(--linea)}
+.oido{font-size:22px;min-height:60px;text-align:center;padding:14px;color:var(--vino);font-weight:600}
+.puls{width:88px;height:88px;border-radius:50%;background:var(--vino);margin:6px auto 0;display:flex;align-items:center;justify-content:center;animation:puls 1.2s infinite}
+.puls svg{width:40px;height:40px;color:#fff}
+@keyframes puls{0%{box-shadow:0 0 0 0 rgba(131,0,64,.45)}100%{box-shadow:0 0 0 26px rgba(131,0,64,0)}}
+@media (max-width:640px){
+ .top{height:52px;padding:6px 8px;gap:6px}
+ .top img{height:22px}
+ .top nav{margin-left:2px}
+ .top nav button{padding:8px 10px;font-size:13px}
+ main{height:calc(100vh - 52px);height:calc(100dvh - 52px)}
+ .venta{display:block;height:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+ .venta.vtk .cat{display:none}
+ .venta:not(.vtk) .tk{display:none}
+ .buscar{flex-wrap:wrap}
+ .buscar input{flex:1 1 100%;font-size:16px}
+ .buscar .btn{flex:1;min-height:48px}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}
+ .prod{min-height:104px}
+ .tk{border-top:0}
+ .lineas{min-height:0}
+ .mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:#fff;border-top:1.5px solid var(--linea);gap:8px}
+ .mbar .btn{flex:1;min-height:56px;font-size:17px}
+ .formas{grid-template-columns:repeat(2,1fr)}
+ .ov{padding:0;align-items:stretch}
+ .md{border-radius:0;max-height:100vh;max-height:100dvh;min-height:100dvh}
+ .pad button{height:54px}
+ .tk-btns{grid-template-columns:repeat(2,1fr)!important}
+ .top nav button,.fams button{min-height:44px}
+ #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
 }
