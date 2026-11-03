@@ -188,6 +188,8 @@ function UbicacionFichar() {
   const [buscando, setBuscando] = useState<string | null>(null)
   const conGeo = (p: string, v: boolean) => guardarConfig(v ? { geo_puestos: [...gp, p] } : { geo_puestos: gp.filter((x) => x !== p), geo_zona_puestos: zp.filter((x) => x !== p) })
   const conZona = (p: string, v: boolean) => guardarConfig(v ? { geo_zona_puestos: [...zp, p], geo_puestos: gp.includes(p) ? gp : [...gp, p] } : { geo_zona_puestos: zp.filter((x) => x !== p) })
+  const alternar = (k: 'hora_puestos' | 'flex_puestos', p: string, v: boolean) => { const l = config[k] || []; guardarConfig({ [k]: v ? [...l, p] : l.filter((x) => x !== p) }) }
+  const cols = 'grid grid-cols-[1fr_repeat(4,3.5rem)] sm:grid-cols-[1fr_repeat(4,4.5rem)] gap-x-2'
   const setL = (ls: Lugar[]) => guardarConfig({ lugares: ls })
   const cambiar = (id: string, c: Partial<Lugar>) => setL(lugares.map((l) => (l.id === id ? { ...l, ...c } : l)))
   const aqui = async (l: Lugar) => {
@@ -201,16 +203,22 @@ function UbicacionFichar() {
     <Tarjeta titulo="Ubicación al fichar">
       <p className="text-sm text-zinc-600">Solo se guarda dónde está la persona <b>en el momento de fichar</b>. Nunca se sigue su recorrido durante el día.</p>
       <div className="mt-3 overflow-hidden rounded-xl border border-vino-100">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 bg-vino-50/60 px-3 py-2 font-cond text-[11px] uppercase tracking-wider text-vino-700"><span>Puesto</span><span className="w-20 text-center">Guardar ubicación</span><span className="w-20 text-center">Avisar fuera de zona</span></div>
+        <div className={cx(cols, 'items-end bg-vino-50/60 px-3 py-2 font-cond text-[10px] uppercase leading-tight tracking-wide text-vino-700')}><span>Puesto</span><span className="text-center">Guardar GPS</span><span className="text-center">Entrada en el sitio</span><span className="text-center">Avisar salida tarde</span><span className="text-center">Horario libre</span></div>
         {config.puestos.map((p) => (
-          <label key={p} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 border-t border-vino-50 px-3 py-1.5 text-sm">
+          <label key={p} className={cx(cols, 'items-center border-t border-vino-50 px-3 py-1.5 text-sm')}>
             <span className="truncate">{p}</span>
-            <span className="w-20 text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={gp.includes(p)} onChange={(e) => conGeo(p, e.target.checked)} /></span>
-            <span className="w-20 text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={zp.includes(p)} onChange={(e) => conZona(p, e.target.checked)} /></span>
+            <span className="text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={gp.includes(p)} onChange={(e) => conGeo(p, e.target.checked)} /></span>
+            <span className="text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={zp.includes(p)} onChange={(e) => conZona(p, e.target.checked)} /></span>
+            <span className="text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={(config.hora_puestos || []).includes(p)} onChange={(e) => alternar('hora_puestos', p, e.target.checked)} /></span>
+            <span className="text-center"><input type="checkbox" className="h-4 w-4 accent-vino-600" checked={(config.flex_puestos || []).includes(p)} onChange={(e) => alternar('flex_puestos', p, e.target.checked)} /></span>
           </label>
         ))}
       </div>
-      <p className="mt-2 text-xs text-zinc-500">«Avisar fuera de zona» marca en naranja la entrada o la salida fichadas lejos de los sitios de trabajo.</p>
+      <ul className="mt-2 space-y-0.5 text-xs text-zinc-500">
+        <li><b>Entrada en el sitio:</b> avisa si la entrada se ficha lejos de los sitios de trabajo.</li>
+        <li><b>Avisar salida tarde:</b> la salida se puede fichar en cualquier sitio (último reparto, casa, tienda), pero avisa si se ficha más de <input type="number" min={0} step={5} value={config.margen_salida ?? 15} onChange={(e) => guardarConfig({ margen_salida: Math.max(0, Number(e.target.value) || 0) })} className="mx-1 w-14 rounded border border-vino-100 px-1 text-center tabular" /> min después de su horario.</li>
+        <li><b>Horario libre:</b> sin avisos de retraso ni de «sin fichar».</li>
+      </ul>
       <p className="mb-2 mt-5 font-cond text-xs uppercase tracking-wider text-vino-800/70">Sitios de trabajo</p>
       <ul className="space-y-2">
         {lugares.map((l) => (

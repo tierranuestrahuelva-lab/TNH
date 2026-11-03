@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowRight, MapPin, CalendarRange, Clock, Coffee, LogIn, Palmtree, PartyPopper, UserCheck, UserX } from 'lucide-react'
 import { useDatos } from '../lib/datos'
 import { diasDesdeCopia } from '../lib/copia'
-import { alertaGeo, mapa, textoGeo } from '../lib/geo'
+import { avisoFichaje, flexible, mapa } from '../lib/geo'
 import { CopiaSeguridad } from './Ajustes'
 import { useIndices } from '../lib/usar'
 import { rango, aMin, fechaCorta, fechaLarga, fmtH, horaDe, hoy, lunesDe, semana, sumarDias, diaSemana, deIso } from '../lib/fechas'
@@ -25,7 +25,7 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
     const t = ix.turnoDe(e.id, f)
     const r = resumenFichajes(ix.fichajesDe(e.id, f), ahora)
     const ini = t?.tipo === 'trabajo' && t.tramos.length ? Math.min(...t.tramos.map((x) => aMin(x.i))) : null
-    const tarde = ini !== null && r.estado === 'fuera' && !r.primera && mAhora > ini + 10
+    const tarde = !flexible(e, config) && ini !== null && r.estado === 'fuera' && !r.primera && mAhora > ini + 10
     return { e, t, r, tarde }
   })
   const trabajan = filas.filter((x) => x.t?.tipo === 'trabajo')
@@ -42,7 +42,7 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
   const manana = sumarDias(f, 1)
 
   const diasCopia = diasDesdeCopia(config.ultima_copia)
-  const fueraZona = rango(sumarDias(f, -6), f).reverse().flatMap((d) => ix.activos.flatMap((e) => ix.fichajesDe(e.id, d).filter(alertaGeo).map((x) => ({ d, e, x }))))
+  const fueraZona = rango(sumarDias(f, -6), f).reverse().flatMap((d) => ix.activos.flatMap((e) => ix.fichajesDe(e.id, d).map((x) => ({ d, e, x, a: avisoFichaje(e, config, x, ix.turnoDe(e.id, d)) })).filter((y) => y.a)))
   return (
     <div className="space-y-6">
       {(diasCopia === null || diasCopia >= 30) && (
@@ -76,12 +76,12 @@ export default function Hoy({ ir }: { ir: (v: string) => void }) {
       )}
 
       {fueraZona.length > 0 && (
-        <Tarjeta titulo={<span className="flex items-center gap-2 text-amber-800"><MapPin size={16} />Fichajes fuera de zona o sin ubicación · últimos 7 días</span>} accion={<button onClick={() => ir('fichajes')} className="text-sm text-vino-600 hover:underline">Revisar</button>}>
+        <Tarjeta titulo={<span className="flex items-center gap-2 text-amber-800"><MapPin size={16} />Fichajes a revisar · últimos 7 días</span>} accion={<button onClick={() => ir('fichajes')} className="text-sm text-vino-600 hover:underline">Revisar</button>}>
           <ul className="divide-y divide-vino-50">
-            {fueraZona.slice(0, 8).map(({ d, e, x }) => (
+            {fueraZona.slice(0, 8).map(({ d, e, x, a }) => (
               <li key={x.id} className="flex items-center gap-3 py-2.5 text-sm">
                 <Avatar emp={e} size={32} />
-                <div className="min-w-0 flex-1"><p className="truncate"><b>{e.nombre}</b> · {x.tipo === 'entrada' ? 'Entrada' : x.tipo === 'salida' ? 'Salida' : x.tipo === 'pausa' ? 'Pausa' : 'Vuelta'} {fechaCorta(d)} a las <b className="tabular">{horaDe(x.ts)}</b></p><p className="truncate text-amber-700">{textoGeo(x, config)}</p></div>
+                <div className="min-w-0 flex-1"><p className="truncate"><b>{e.nombre}</b> · {x.tipo === 'entrada' ? 'Entrada' : x.tipo === 'salida' ? 'Salida' : x.tipo === 'pausa' ? 'Pausa' : 'Vuelta'} {fechaCorta(d)} a las <b className="tabular">{horaDe(x.ts)}</b></p><p className="truncate text-amber-700">{a}</p></div>
                 {x.lat != null && <a href={mapa(x)} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-2 py-1 text-vino-600 hover:bg-vino-50">Ver mapa</a>}
               </li>
             ))}

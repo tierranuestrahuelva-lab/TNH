@@ -10,6 +10,9 @@ export const CONFIG_BASE: Config = {
   lugares: [{ id: 'almacen', nombre: 'Almacén', lat: 37.25634, lon: -6.94829, radio: 150 }],
   geo_puestos: ['Repartidor/a', 'Comercial'],
   geo_zona_puestos: ['Repartidor/a'],
+  flex_puestos: ['Comercial'],
+  hora_puestos: ['Repartidor/a'],
+  margen_salida: 15,
   centros: ['Tienda Huelva', 'Almacén', 'Reparto'],
   puestos: ['Dirección', 'Encargado/a de tienda', 'Dependiente/a', 'Sumiller', 'Comercial', 'Repartidor/a', 'Mozo/a de almacén', 'Administrativo/a'],
   plantillas: [
@@ -50,5 +53,5 @@ export const CONFIG_BASE: Config = {
 }
 
 // Fecha de la última versión del texto de protección de datos: hay que volver a confirmarlo si es anterior.
-export const PRIV_ACTUALIZADA = '2026-10-30T12:00:00Z'
+export const PRIV_ACTUALIZADA = '2026-11-03T09:17:00Z'
 export const privacidadLeida = (e: { privacidad_at?: string | null }) => !!e.privacidad_at && e.privacidad_at >= PRIV_ACTUALIZADA

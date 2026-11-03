@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, Coffee, LogIn, LogOut, MapPin, Play, ShieldCheck } from 'lucide-react'
-import { alertaGeo, tieneGeo, textoGeo, ubicarFichaje, usaGeo, type DatosGeo } from '../lib/geo'
+import { alertaGeo, controlaHora, tieneGeo, textoGeo, ubicarFichaje, usaGeo, type DatosGeo } from '../lib/geo'
 import { privacidadLeida } from '../lib/config'
 import { useDatos } from '../lib/datos'
 import { useIndices } from '../lib/usar'
@@ -100,7 +100,7 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         <div className="mb-2 flex justify-between text-sm"><span>Trabajado <b className="tabular">{fmtH(trabSem)}</b></span><span className="text-zinc-500">Previsto {fmtH(planSem)} · Contrato {emp.horas_semana} h</span></div>
         <Barra valor={trabSem} max={Math.max(planSem, 1)} color={emp.color || undefined} />
       </Tarjeta>
-      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si te equivocas, avisa a tu encargado/a para corregirlo.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}</p>
+      <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si te equivocas, avisa a tu encargado/a para corregirlo.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}{controlaHora(emp, config) && ' Ficha la salida en cuanto termines, estés donde estés (último reparto, casa o tienda).'}</p>
     </div>
   )
 }

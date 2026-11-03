@@ -1,9 +1,25 @@
-import type { Config, Empleado, Fichaje, TipoFichaje } from './types'
+import type { Config, Empleado, Fichaje, TipoFichaje, Turno } from './types'
+import { aMin, deMin, fmtH } from './fechas'
 
 export type DatosGeo = Pick<Fichaje, 'lat' | 'lon' | 'precision_m' | 'lugar' | 'distancia_m' | 'fuera_zona' | 'geo_error'>
 
 export const usaGeo = (emp: Empleado, c: Config) => !!emp.puesto && (c.geo_puestos || []).includes(emp.puesto)
-const exigeZona = (emp: Empleado, c: Config, tipo: TipoFichaje) => (tipo === 'entrada' || tipo === 'salida') && !!emp.puesto && (c.geo_zona_puestos || []).includes(emp.puesto)
+const en = (l: string[] | undefined, emp: Empleado) => !!emp.puesto && (l || []).includes(emp.puesto)
+const exigeZona = (emp: Empleado, c: Config, tipo: TipoFichaje) => tipo === 'entrada' && en(c.geo_zona_puestos, emp)
+export const flexible = (emp: Empleado, c: Config) => en(c.flex_puestos, emp)
+export const controlaHora = (emp: Empleado, c: Config) => en(c.hora_puestos, emp)
+
+export function salidaTarde(emp: Empleado, c: Config, x: Fichaje, t?: Turno | null) {
+  if (x.tipo !== 'salida' || !controlaHora(emp, c) || t?.tipo !== 'trabajo' || !t.tramos.length) return null
+  const fin = Math.max(...t.tramos.map((r) => aMin(r.f))), d = new Date(x.ts), m = d.getHours() * 60 + d.getMinutes() - fin
+  return m > (c.margen_salida ?? 15) ? { min: m, fin: deMin(fin) } : null
+}
+
+export function avisoFichaje(emp: Empleado, c: Config, x: Fichaje, t?: Turno | null) {
+  const st = salidaTarde(emp, c, x, t)
+  const p = [alertaGeo(x) && textoGeo(x, c), st && `Salida ${fmtH(st.min)} después de su horario (${st.fin})${x.lat != null && !alertaGeo(x) ? ' · ' + textoGeo(x, c) : ''}`].filter(Boolean)
+  return p.length ? p.join(' · ') : null
+}
 
 export function distancia(a: number, b: number, c: number, d: number) {
   const R = 6371000, r = Math.PI / 180

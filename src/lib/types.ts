@@ -103,6 +103,9 @@ export interface Config {
   lugares?: Lugar[]
   geo_puestos?: string[]
   geo_zona_puestos?: string[]
+  flex_puestos?: string[]
+  hora_puestos?: string[]
+  margen_salida?: number
 }
 export interface Lugar { id: string; nombre: string; lat: number; lon: number; radio: number }
 
