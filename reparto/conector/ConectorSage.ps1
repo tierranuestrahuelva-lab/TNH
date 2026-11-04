@@ -10,18 +10,50 @@ param(
   [string]$Salida = "$([Environment]::GetFolderPath('Desktop'))\reparto-sage.json",
   [string]$Usuario = '',          # usuario SQL de solo lectura (si no, el de Windows)
   [string]$Clave = '',
-  [switch]$Explorar               # muestra instancias, bases y columnas (diagnóstico)
+  [switch]$Explorar,              # muestra instancias, bases y columnas (diagnóstico)
+  [switch]$Subir,                 # envía albaranes y clientes a la base central (sin dejar archivo)
+  [string]$Archivo = '',          # envía a la base central un reparto-sage.json ya generado
+  [string]$EquipoEmail = '',
+  [string]$EquipoClave = '',
+  [string]$SupabaseUrl = 'https://zxrrwwmxbvdlkalqzzau.supabase.co',
+  [string]$SupabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4cnJ3d214YnZkbGthbHF6emF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzkxODQsImV4cCI6MjEwODg1NTE4NH0.IZltQVDiXx6QAYSwt5Lt6wGA8U0YRNlKvrICaTEUYh0'
 )
 # conector.ini junto al script (opcional): Servidor=..., Usuario=..., Clave=..., BaseDatos=...
 $ini = Join-Path $PSScriptRoot 'conector.ini'
 if (Test-Path $ini) {
   foreach ($l in Get-Content $ini) {
-    if ($l -match '^\s*(Servidor|Usuario|Clave|BaseDatos)\s*=\s*(.*?)\s*$') {
+    if ($l -match '^\s*(Servidor|Usuario|Clave|BaseDatos|EquipoEmail|EquipoClave)\s*=\s*(.*?)\s*$') {
       if (-not (Get-Variable $matches[1] -ValueOnly)) { Set-Variable $matches[1] $matches[2] }
     }
   }
 }
 $ErrorActionPreference = 'Stop'
+if (-not $EquipoEmail) { $EquipoEmail = 'reparto@tierranuestra.es' }
+$log = Join-Path $PSScriptRoot 'conector.log'
+function Anotar($t) {
+  if ((Test-Path $log) -and (Get-Item $log).Length -gt 1MB) { Remove-Item $log }
+  Add-Content -Path $log -Value "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) $t" -Encoding UTF8
+}
+trap { if ($Subir -or $Archivo) { Anotar "ERROR $($_.Exception.Message)" }; throw }
+
+function Subir-Central($albaranes, $clientes, $base) {
+  if (-not $EquipoClave) { throw 'Falta EquipoClave (contraseña del equipo de la app) en conector.ini.' }
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  $h = @{ apikey = $SupabaseKey }
+  $cred = @{ email = $EquipoEmail; password = $EquipoClave } | ConvertTo-Json
+  $tok = Invoke-RestMethod -Method Post -Uri "$SupabaseUrl/auth/v1/token?grant_type=password" -Headers $h -ContentType 'application/json' -Body $cred
+  $h.Authorization = "Bearer $($tok.access_token)"
+  $info = [ordered]@{ at = (Get-Date).ToString('o'); albaranes = @($albaranes).Count; base = $base; equipo = $env:COMPUTERNAME }
+  $body = [ordered]@{ albaranes = @($albaranes); clientes = $clientes; info = $info } | ConvertTo-Json -Depth 8 -Compress
+  $r = Invoke-RestMethod -Method Post -Uri "$SupabaseUrl/rest/v1/rpc/sage_subir" -Headers $h -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
+  $msg = "OK $(@($albaranes).Count) albaranes leidos de Sage ($base): $($r.nuevos) nuevos, $($r.actualizados) actualizados" + $(if ($clientes) { ", $($clientes.Count) clientes" } else { '' })
+  Anotar $msg; Write-Host $msg
+}
+if ($Archivo) {
+  $d = [IO.File]::ReadAllText($Archivo, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  Subir-Central @($d.albaranes) $null "$($d.base)"
+  return
+}
 
 function Abrir($srv, $db) {
   $aut = if ($Usuario) { "User ID=$Usuario;Password=$Clave" } else { 'Integrated Security=True' }
@@ -129,6 +161,16 @@ if ($Dl.num -and $Dl.def) {
     if ("$($r.def)".Trim() -or $u) { [void]$lineas[$k].Add([ordered]@{ codigo = if ($det.Columns.Contains('art')) { "$($r.art)".Trim() } else { '' }; nombre = "$($r.def)".Trim(); unidades = $u }) }
   }
 }
+$cli = $null
+if ($Subir -and $C.cod) {
+  $sc = @("[$($C.cod)] AS cod"); foreach ($k in 'nom','dir','cp','pob','tel') { if ($C[$k]) { $sc += "[$($C[$k])] AS $k" } }
+  $cli = [ordered]@{}
+  foreach ($r in (Consulta $con "SELECT $($sc -join ', ') FROM clientes")) {
+    $g = { param($c) if ($r.Table.Columns.Contains($c) -and $r[$c] -isnot [DBNull]) { "$($r[$c])".Trim() } else { '' } }
+    $cod = & $g 'cod'; if (-not $cod) { continue }
+    $cli[$cod] = [ordered]@{ nombre = & $g 'nom'; direccion = & $g 'dir'; cp = & $g 'cp'; poblacion = & $g 'pob'; telefono = & $g 'tel' }
+  }
+}
 $con.Close()
 
 function V($r, $c) { if ($r.Table.Columns.Contains($c) -and $r[$c] -isnot [DBNull]) { "$($r[$c])".Trim() } else { '' } }
@@ -145,6 +187,7 @@ $alb = foreach ($r in $cab) {
     estado = 'pendiente'; repartidor = ''; orden = 0
   }
 }
+if ($Subir) { Subir-Central @($alb) $cli $dst.Base; return }
 $doc = [ordered]@{ tipo = 'tn-reparto'; de = 'sage'; generado = (Get-Date).ToString('o'); base = $dst.Base; albaranes = @($alb) }
 $json = $doc | ConvertTo-Json -Depth 6 -Compress
 [IO.File]::WriteAllText($Salida, $json, (New-Object System.Text.UTF8Encoding $false))

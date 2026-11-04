@@ -428,9 +428,9 @@ function vImportar(m) {
   m.innerHTML = `<h1>Conexión con Sage 50</h1>
   <div class="card"><h2>🔌 Conexión directa</h2>
   <p>El <b>Conector Sage</b> instalado en el ordenador de la oficina lee de Sage 50 los albaranes de venta y los clientes (solo lectura, no modifica nada en Sage).</p>
-  ${NUBE ? `<p>Última lectura de Sage: <b>${u ? new Date(u.at).toLocaleString('es-ES') + ' · ' + u.albaranes + ' albaranes' : 'todavía ninguna'}</b>. Los albaranes nuevos aparecen solos en <b>Albaranes</b>.</p>`
+  ${NUBE ? `<p>Última lectura de Sage: <b>${u ? new Date(u.at).toLocaleString('es-ES') + ' · ' + u.albaranes + ' albaranes' + (u.nuevos != null ? ` (${u.nuevos} nuevos, ${u.actualizados} cambiados)` : '') + (u.equipo ? ' · desde ' + h(u.equipo) : '') : 'todavía ninguna'}</b>.${u && Date.now() - new Date(u.at) > 20 * 60000 ? ' <b style="color:var(--ko)">⚠ Hace más de 20 minutos: revisa que el ordenador del conector esté encendido.</b>' : ''} Los albaranes nuevos aparecen solos en <b>Albaranes</b> y en <b>Almacén</b>; lo hecho en la calle y en el almacén nunca se borra.</p>`
     : `<p>Cada vez que se ejecuta, deja un archivo <b>reparto-sage.json</b> en el escritorio. Cárgalo aquí:</p><button class="btn" id="imp-json">📥 Cargar archivo del Conector Sage</button>`}
-  <p class="mut" style="margin-top:12px">Instalación en el ordenador de Sage: descarga el conector, descomprímelo en el escritorio y haz doble clic en <b>Conector Sage - Reparto</b>.</p><a class="btn sec" href="conector-sage-reparto.zip" download>⬇ Descargar Conector Sage</a>
+  <p class="mut" style="margin-top:12px">Instalación en el ordenador de Sage: descarga el conector, descomprímelo, pon dentro el archivo <b>conector.ini</b> y haz doble clic en <b>Instalar sincronizacion automatica</b>. Desde entonces copia Sage a la app cada 5 minutos.</p><a class="btn sec" href="conector-sage-reparto.zip" download>⬇ Descargar Conector Sage</a>
   </div>
   <div class="card"><h2>📊 Desde Excel de Sage</h2><p class="mut">Alternativa: en Sage 50 saca un listado de albaranes de venta (con cliente, dirección, población, teléfono y total) y exporta a Excel. La app reconoce las columnas sola.</p>
   <button class="btn sec" id="imp-xls">📥 Cargar Excel de albaranes o de clientes</button></div>
