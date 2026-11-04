@@ -260,14 +260,16 @@ function pintarMapa(el, paradas, opts = {}) {
 // ---------- pantallas ----------
 function render(silencioso) {
   if (silencioso && $('#modal:not(.hidden)')) return
-  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp'].includes(V.tab)) return
+  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp', 'cargar'].includes(V.tab)) return
+  if (silencioso && V.tab === 'preparar' && window.TNP?.enPicking()) return
   const app = $('#app')
   if (!U) return pantallaEntrada(app)
   if (NUBE && !Nube.token) return pantallaClave(app)
   if (U.rol === 'repartidor') iniciarGPS()
   const tabs = U.rol === 'oficina'
-    ? [['hoy', 'Albaranes'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
-    : [['ruta', 'Mi ruta'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
+    ? [['hoy', 'Albaranes'], ['almacen', 'Almacén'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
+    : U.rol === 'almacen' ? [['preparar', 'Preparar pedidos'], ['cargar', 'Cargar furgoneta']]
+    : [['ruta', 'Mi ruta'], ['cargar', 'Cargar'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
   if (!V.tab || !tabs.some((t) => t[0] === V.tab)) V.tab = tabs[0][0]
   const sc = $('main')?.scrollTop, sy = window.scrollY
   app.innerHTML = `<div class="top"><img src="${LOGO}" alt="Tierra Nuestra"><span class="t">Reparto</span><span class="sp"></span><span class="nube" id="nube">${nubeTxt()}</span><button id="salir" title="Cambiar de usuario">${h(U.nombre)} ⏻</button></div>
@@ -275,7 +277,7 @@ function render(silencioso) {
   $$('[data-tab]').forEach((b) => (b.onclick = () => { V.tab = b.dataset.tab; render(); window.scrollTo(0, 0) }))
   $('#salir').onclick = () => { if (confirm('¿Cambiar de usuario?')) { U = null; localStorage.removeItem('tn-reparto-user'); render() } }
   const main = $('#main')
-  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, whatsapp: vWhatsapp, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar })[V.tab](main)
+  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, whatsapp: vWhatsapp, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar, almacen: (x) => TNP.vTablero(x), preparar: (x) => TNP.vPreparar(x), cargar: (x) => TNP.vCargar(x) })[V.tab](main)
   if (silencioso) window.scrollTo(0, sy)
 }
 
@@ -284,9 +286,12 @@ function pantallaEntrada(app) {
   <div class="box col"><h2>¿Quién eres?</h2>
   <button class="btn big" id="ofi">🏢 Oficina</button>
   <label>Repartidor</label><select id="rep">${S.repartidores.map((r) => `<option>${h(r)}</option>`).join('')}</select>
-  <button class="btn big sec" id="rr">🚚 Entrar como repartidor</button></div></div>`
+  <button class="btn big sec" id="rr">🚚 Entrar como repartidor</button>
+  <label>Almacén (tu nombre)</label><input id="alm" placeholder="Nombre del preparador" value="${h(localStorage.getItem('tn-alm-nombre') || '')}">
+  <button class="btn big sec" id="al">📦 Entrar en almacén</button></div></div>`
   $('#ofi').onclick = () => entrar({ rol: 'oficina', nombre: 'Oficina' })
   $('#rr').onclick = () => entrar({ rol: 'repartidor', nombre: $('#rep').value })
+  $('#al').onclick = () => { const n = $('#alm').value.trim(); if (!n) return toast('Escribe tu nombre'); localStorage.setItem('tn-alm-nombre', n); entrar({ rol: 'almacen', nombre: n }) }
 }
 function entrar(u) { U = u; localStorage.setItem('tn-reparto-user', JSON.stringify(U)); V.tab = null; render(); Nube.bajar() }
 function pantallaClave(app) {
@@ -378,7 +383,7 @@ function detalle(a) {
   if ($('#d-rei')) $('#d-rei').onclick = () => { if (!confirm('¿Quitar la entrega/incidencia y dejarlo pendiente?')) return; a.estado = a.repartidor ? 'ruta' : 'pendiente'; delete a.entrega; delete a.incidencia; tocar(a); cerrar(); render() }
   if ($('#d-del')) $('#d-del').onclick = () => { if (!confirm('¿Borrar este pedido?')) return; S.albaranes = S.albaranes.filter((x) => x !== a); guardar(); cerrar(); render() }
 }
-const tablaLineas = (a) => a.lineas?.length ? `<div class="card"><h3>Mercancía</h3><table class="lineas"><tbody>${a.lineas.map((l) => `<tr><td style="width:60px;text-align:right"><b>${h(l.unidades)}</b></td><td>${h(l.nombre)}</td><td class="mut">${h(l.codigo || '')}</td></tr>`).join('')}</tbody></table><div style="text-align:right;margin-top:6px">Total: <b>${eur(a.total)}</b>${a.formaPago ? ' · ' + h(a.formaPago) : ''}</div></div>` : ''
+const tablaLineas = (a) => a.lineas?.length ? `<div class="card"><h3>Mercancía</h3><table class="lineas"><tbody>${a.lineas.map((l) => `<tr><td style="width:90px;text-align:right"><b>${h(l.unidades)}</b>${l.unidad ? ' ' + h(l.unidad) : ''}</td><td>${h(l.nombre)}</td><td class="mut">${h(l.codigo || '')}</td></tr>`).join('')}</tbody></table><div style="text-align:right;margin-top:6px">Total: <b>${eur(a.total)}</b>${a.formaPago ? ' · ' + h(a.formaPago) : ''}</div></div>` : ''
 
 // ----- OFICINA: rutas -----
 function vRutas(m) {
@@ -745,4 +750,5 @@ async function waConversacion(tel) {
   const m = await Nube.api('wa_mensajes?select=*&telefono=eq.' + encodeURIComponent(tel) + '&order=at.asc&limit=200')
   modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
 }
+window.TNR = { get S() { return S }, get U() { return U }, V, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha }
 })()
