@@ -27,11 +27,54 @@ export function distancia(a: number, b: number, c: number, d: number) {
   return 2 * R * Math.asin(Math.sqrt(x))
 }
 
-export function posicion(): Promise<GeolocationPosition> {
-  return new Promise((ok, mal) => {
-    if (!navigator.geolocation) return mal({ code: 99 })
-    navigator.geolocation.getCurrentPosition(ok, mal, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 })
-  })
+/** Más de esto (en metros) es una ubicación aproximada: el móvil no tiene activada la «Ubicación exacta» */
+export const PRECISION_MAX = 1000
+
+const pedir = (timeout: number) => new Promise<GeolocationPosition>((ok, mal) => {
+  if (!navigator.geolocation) return mal({ code: 99 })
+  navigator.geolocation.getCurrentPosition(ok, mal, { enableHighAccuracy: true, timeout, maximumAge: 0 })
+})
+
+/** Ubicación actual; si la primera lectura es poco precisa (habitual en iPhone) se pide otra y se queda la mejor */
+export async function posicion(): Promise<GeolocationPosition> {
+  const p = await pedir(15000)
+  if (p.coords.accuracy <= 100) return p
+  try { const q = await pedir(8000); return q.coords.accuracy < p.coords.accuracy ? q : p } catch { return p }
+}
+
+export const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)
+
+export const AYUDA_UBICACION = {
+  iphone: [
+    'Abre Ajustes → Privacidad y seguridad → Localización y activa «Localización».',
+    'En esa misma lista entra en «Sitios web de Safari» (o en Chrome, si abres la app con Chrome), elige «Al usar la app» y activa «Ubicación exacta».',
+    'Si alguna vez pulsaste «No permitir»: Ajustes → Apps → Safari → Ubicación → «Preguntar» o «Permitir».',
+    'Vuelve aquí, pulsa «Comprobar mi ubicación» y acepta «Permitir».',
+  ],
+  android: [
+    'Desliza desde arriba de la pantalla y activa «Ubicación».',
+    'En Chrome, toca el icono junto a la dirección web → Permisos → Ubicación → «Permitir».',
+    'En Ajustes → Ubicación, activa «Ubicación precisa» (Google).',
+    'Vuelve aquí y pulsa «Comprobar mi ubicación».',
+  ],
+}
+
+const ERROR_GEO: Record<number, string> = {
+  1: 'Permiso de ubicación denegado',
+  2: 'La localización del móvil está apagada',
+  3: 'El móvil no dio la ubicación a tiempo',
+}
+
+export async function comprobarUbicacion(): Promise<{ ok: boolean; texto: string }> {
+  try {
+    const p = await posicion(), m = Math.round(p.coords.accuracy)
+    return m > PRECISION_MAX
+      ? { ok: false, texto: `Ubicación aproximada (± ${km(m)}): activa «Ubicación exacta»` }
+      : { ok: true, texto: `Ubicación correcta (± ${km(m)})` }
+  } catch (e) {
+    const code = (e as GeolocationPositionError)?.code
+    return { ok: false, texto: ERROR_GEO[code] || 'Este móvil no da la ubicación' }
+  }
 }
 
 export async function ubicarFichaje(emp: Empleado, c: Config, tipo: TipoFichaje): Promise<DatosGeo> {
@@ -40,16 +83,17 @@ export async function ubicarFichaje(emp: Empleado, c: Config, tipo: TipoFichaje)
     const lat = p.coords.latitude, lon = p.coords.longitude, precision_m = Math.round(p.coords.accuracy)
     const cerca = (c.lugares || []).map((l) => ({ l, d: distancia(lat, lon, l.lat, l.lon) })).sort((a, b) => a.d - b.d)[0]
     const dentro = !!cerca && cerca.d <= cerca.l.radio + Math.min(precision_m, 100)
+    const vaga = precision_m > PRECISION_MAX
     return {
       lat, lon, precision_m,
       lugar: dentro ? cerca.l.nombre : null,
       distancia_m: cerca ? Math.round(cerca.d) : null,
-      fuera_zona: exigeZona(emp, c, tipo) ? !dentro : null,
-      geo_error: null,
+      fuera_zona: exigeZona(emp, c, tipo) && !vaga ? !dentro : null,
+      geo_error: vaga ? 'Ubicación aproximada: el móvil no tiene activada la «Ubicación exacta»' : null,
     }
   } catch (e) {
     const code = (e as GeolocationPositionError)?.code
-    return { geo_error: code === 1 ? 'Permiso de ubicación denegado' : code === 3 ? 'El móvil no dio la ubicación a tiempo' : 'Ubicación no disponible' }
+    return { geo_error: ERROR_GEO[code] || 'Ubicación no disponible' }
   }
 }
 
@@ -58,6 +102,7 @@ export const tieneGeo = (f: Fichaje) => f.lat != null || !!f.geo_error
 export const km = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })} km`)
 
 export function textoGeo(f: Fichaje, c: Config) {
+  if (f.geo_error && f.lat != null) return `Ubicación aproximada (± ${km(f.precision_m || 0)}): revisar`
   if (f.geo_error) return `Sin ubicación (${f.geo_error.toLowerCase()})`
   if (f.lat == null) return ''
   if (f.lugar) return `En ${f.lugar}`

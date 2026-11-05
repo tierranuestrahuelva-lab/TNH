@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { avisoFichaje, distancia, flexible, salidaTarde, textoGeo, ubicarFichaje, usaGeo } from '../../src/lib/geo'
+import { AYUDA_UBICACION, PRECISION_MAX, avisoFichaje, comprobarUbicacion, distancia, flexible, salidaTarde, textoGeo, ubicarFichaje, usaGeo } from '../../src/lib/geo'
 import { CONFIG_BASE } from '../../src/lib/config'
 import type { Empleado } from '../../src/lib/types'
 
@@ -74,5 +74,33 @@ describe('ubicación al fichar', () => {
     expect((await ubicarFichaje(repartidor, CONFIG_BASE, 'entrada')).geo_error).toBe('El móvil no dio la ubicación a tiempo')
     vi.stubGlobal('navigator', {})
     expect((await ubicarFichaje(repartidor, CONFIG_BASE, 'entrada')).geo_error).toBe('Ubicación no disponible')
+  })
+})
+
+describe('iPhone y ubicación poco precisa', () => {
+  it('[GEO-09] ubicación aproximada: se guarda, no marca fuera de zona y queda a revisar', async () => {
+    gps(ALMACEN.lat + 0.03, ALMACEN.lon, 3000)
+    const g = await ubicarFichaje(repartidor, CONFIG_BASE, 'entrada')
+    expect(g.lat).toBeCloseTo(ALMACEN.lat + 0.03)
+    expect(g.fuera_zona).toBeNull()
+    expect(g.geo_error).toMatch(/aproximada/)
+    expect(textoGeo({ id: 'f', empleado_id: 'x', ts: '', tipo: 'entrada', ...g }, CONFIG_BASE)).toMatch(/Ubicación aproximada \(± 3 km\)/)
+  })
+  it('[GEO-09] si la primera lectura es mala se queda la mejor', async () => {
+    let n = 0
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: (ok: any) => ok({ coords: { latitude: ALMACEN.lat, longitude: ALMACEN.lon, accuracy: n++ ? 12 : 2500 } }) } })
+    const g = await ubicarFichaje(repartidor, CONFIG_BASE, 'entrada')
+    expect(g.precision_m).toBe(12)
+    expect(g.fuera_zona).toBe(false)
+  })
+  it('[GEO-10] comprobar: correcta, aproximada o sin permiso, con pasos para iPhone y Android', async () => {
+    gps(ALMACEN.lat, ALMACEN.lon, 8)
+    expect(await comprobarUbicacion()).toEqual({ ok: true, texto: 'Ubicación correcta (± 8 m)' })
+    gps(ALMACEN.lat, ALMACEN.lon, PRECISION_MAX + 500)
+    expect((await comprobarUbicacion()).ok).toBe(false)
+    gpsError(1)
+    expect(await comprobarUbicacion()).toEqual({ ok: false, texto: 'Permiso de ubicación denegado' })
+    expect(AYUDA_UBICACION.iphone.join(' ')).toMatch(/Ubicación exacta/)
+    expect(AYUDA_UBICACION.android.join(' ')).toMatch(/Ubicación precisa/)
   })
 })

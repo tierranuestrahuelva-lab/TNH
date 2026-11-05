@@ -77,6 +77,8 @@ lados en un móvil.
 - **GEO-06** El repartidor puede fichar la salida donde termine (último reparto, casa o tienda): se guarda la ubicación, sin «fuera de zona».
 - **GEO-07** En los puestos con «Avisar salida tarde», una salida fichada más de `margen_salida` minutos (15 por defecto) después del fin del turno sale en «Fichajes a revisar».
 - **GEO-08** Los puestos con «Horario libre» (Comercial por defecto) no generan avisos de retraso ni de «sin fichar».
+- **GEO-09** iPhone/Android con «Ubicación exacta» desactivada (precisión peor de 1 km): se guarda la ubicación aproximada pero NO se marca «fuera de zona»; queda «Ubicación aproximada: revisar» en Fichajes a revisar. Si la primera lectura es poco precisa se pide otra y se guarda la mejor.
+- **GEO-10** Los puestos con ubicación ven «Comprobar mi ubicación» en Fichar, con el resultado (correcta / aproximada / permiso denegado) y los pasos para activarla en iPhone y Android. Si su último fichaje quedó sin ubicación, los pasos salen abiertos.
 
 ## DAT · Datos
 - **DAT-01** Todo lo que la app escribe en la base de datos son columnas que existen (si no,

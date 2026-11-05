@@ -142,6 +142,15 @@ test.describe('geolocalización', () => {
     expect(f.lat ?? null).toBeNull()
   })
 
+  test('[GEO-10] comprobar la ubicación y ver los pasos para iPhone', async ({ page, abrir }) => {
+    await abrir({ perfil: yo('juan'), geo: 'denegada' })
+    await page.getByRole('button', { name: 'Comprobar mi ubicación' }).click()
+    await expect(page.getByText('Permiso de ubicación denegado')).toBeVisible()
+    await page.getByRole('button', { name: 'iPhone', exact: true }).click()
+    await expect(page.getByText(/Privacidad y seguridad → Localización/)).toBeVisible()
+    await expect(page.getByText(/activa «Ubicación exacta»/)).toBeVisible()
+  })
+
   test('[GEO-05] puesto sin geolocalización: no se pide ubicación', async ({ page, abrir, context }) => {
     await context.grantPermissions(['geolocation'])
     await context.setGeolocation(ALMACEN)

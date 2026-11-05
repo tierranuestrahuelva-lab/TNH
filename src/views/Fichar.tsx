@@ -12,6 +12,7 @@ import { TIPOS, textoTurno, minTurno, minutosDia, resumenFichajes, textoTramos }
 import { toast } from '../lib/toast'
 import { Barra, Tarjeta, cx } from '../ui'
 import { useAhora } from './Hoy'
+import AyudaUbicacion from './AyudaUbicacion'
 
 const NOMBRE: Record<TipoFichaje, string> = { entrada: 'Entrada', pausa: 'Inicio de pausa', vuelta: 'Fin de pausa', salida: 'Salida' }
 
@@ -135,6 +136,7 @@ export default function Fichar({ emp, ir }: { emp: Empleado; ir?: (v: string) =>
         <div className="mb-2 flex justify-between text-sm"><span>Trabajado <b className="tabular">{fmtH(trabSem)}</b></span><span className="text-zinc-500">Previsto {fmtH(planSem)} · Contrato {emp.horas_semana} h</span></div>
         <Barra valor={trabSem} max={Math.max(planSem, 1)} color={emp.color || undefined} />
       </Tarjeta>
+      {geo && <AyudaUbicacion error={fs.filter((x) => x.geo_error).slice(-1)[0]?.geo_error || null} />}
       <p className="px-2 text-center text-xs text-zinc-400">Registro de jornada (art. 34.9 del Estatuto de los Trabajadores). Si se te olvida fichar, pide la corrección desde aquí: nadie puede cambiar un fichaje sin dejar constancia.{geo && ' Por tu puesto, al fichar se guarda dónde estás en ese momento; no se sigue tu ubicación durante el día.'}{controlaHora(emp, config) && ' Ficha la salida en cuanto termines, estés donde estés (último reparto, casa o tienda).'}</p>
     </div>
   )
