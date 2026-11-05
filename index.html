@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#830040">
+<title>Guía de Vinos · Tierra Nuestra</title>
+<meta name="description" content="Guía de vinos de la tienda Tierra Nuestra Huelva: precios, uvas, bodegas y D.O.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Guía TN">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a class="marca" href="#/" aria-label="Inicio"><img src="assets/logo-white.svg" alt="Tierra Nuestra"><span>Guía de vinos · Tienda</span></a>
+    <nav class="nav-pc" id="nav-pc"></nav>
+  </div>
+  <form class="buscador" id="f-busca" role="search">
+    <span class="lupa" aria-hidden="true"></span>
+    <input id="q" type="search" placeholder="Vino, bodega, uva, D.O. o código" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+    <button type="button" class="ib" id="b-mic" aria-label="Buscar con la voz"></button>
+    <button type="button" class="ib" id="b-cam" aria-label="Escanear código de barras"></button>
+  </form>
+</header>
+<main id="main"></main>
+<nav class="nav-mov" id="nav-mov"></nav>
+<div id="sheet-root"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="data.js"></script>
+<script src="assets/qrcode.js" defer></script>
+<script src="app.js"></script>
+</body>
+</html>
