@@ -334,5 +334,5 @@ function vTablero(m) {
   $$('[data-re]').forEach((b) => (b.onclick = () => { const a = R().S.albaranes.find((x) => x.id === b.dataset.re); if (!confirm('¿Borrar la preparación de este pedido y empezarlo de cero?')) return; delete a.prep; R().tocar(a); R().render() }))
 }
 
-window.TNP = { vPreparar, vCargar, vTablero, _leer: leer, _cargar: cargar, _codigoBulto: codigoBulto, _lineas: lineas, enPicking: () => !!PK }
+window.TNP = { codigoDe: (v) => { cargarArticulos(); const x = CB[String(v).trim()]; return x ? Object.assign({ caja: esCaja(String(v).trim()) }, x) : null }, vPreparar, vCargar, vTablero, _leer: leer, _cargar: cargar, _codigoBulto: codigoBulto, _lineas: lineas, enPicking: () => !!PK }
 })()

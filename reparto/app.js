@@ -73,16 +73,21 @@ const Nube = {
     if (!r.ok) throw new Error(await r.text())
     return r.status === 204 ? null : r.json().catch(() => null)
   },
+  pend: new Set(JSON.parse(localStorage.getItem('tn-reparto-pend') || '[]')),
+  marcarPend(lista, si) { for (const a of lista) si ? this.pend.add(a.id) : this.pend.delete(a.id); localStorage.setItem('tn-reparto-pend', JSON.stringify([...this.pend])) },
+  pendientes() { return this.pend.size },
   async subir(lista) {
-    if (!NUBE || !this.token) return
+    if (!NUBE) return
+    if (!this.token) return this.marcarPend(lista, true)
     try {
       await this.api('reparto_albaranes', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(lista.map((a) => ({ id: a.id, fecha: a.fecha, data: a, upd: a.upd || Date.now() }))) })
-      this.ok()
-    } catch (e) { this.fallo() }
+      this.marcarPend(lista, false); this.ok()
+    } catch (e) { this.marcarPend(lista, true); this.fallo() }
   },
   desde: Number(localStorage.getItem('tn-reparto-desde') || 0),
   async bajar() {
     if (!NUBE || !this.token) return
+    if (this.pend.size) { const l = S.albaranes.filter((a) => this.pend.has(a.id)); if (l.length) await this.subir(l); else this.marcarPend([...this.pend].map((id) => ({ id })), false) }
     try {
       const filas = await this.api('reparto_albaranes?select=data,upd&upd=gt.' + this.desde + '&order=upd.asc&limit=1000')
       if (filas.length) {
@@ -260,7 +265,7 @@ function pintarMapa(el, paradas, opts = {}) {
 // ---------- pantallas ----------
 function render(silencioso) {
   if (silencioso && $('#modal:not(.hidden)')) return
-  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp', 'cargar'].includes(V.tab)) return
+  if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp', 'cargar', 'cli', 'cat', 'ped'].includes(V.tab)) return
   if (silencioso && V.tab === 'preparar' && window.TNP?.enPicking()) return
   const app = $('#app')
   if (!U) return pantallaEntrada(app)
@@ -269,6 +274,7 @@ function render(silencioso) {
   const tabs = U.rol === 'oficina'
     ? [['hoy', 'Albaranes'], ['almacen', 'Almacén'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
     : U.rol === 'almacen' ? [['preparar', 'Preparar pedidos'], ['cargar', 'Cargar furgoneta']]
+    : U.rol === 'comercial' ? [['cli', 'Clientes'], ['cat', 'Catálogo'], ['ped', 'Mis pedidos']]
     : [['ruta', 'Mi ruta'], ['cargar', 'Cargar'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
   if (!V.tab || !tabs.some((t) => t[0] === V.tab)) V.tab = tabs[0][0]
   const sc = $('main')?.scrollTop, sy = window.scrollY
@@ -277,7 +283,7 @@ function render(silencioso) {
   $$('[data-tab]').forEach((b) => (b.onclick = () => { V.tab = b.dataset.tab; render(); window.scrollTo(0, 0) }))
   $('#salir').onclick = () => { if (confirm('¿Cambiar de usuario?')) { U = null; localStorage.removeItem('tn-reparto-user'); render() } }
   const main = $('#main')
-  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, whatsapp: vWhatsapp, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar, almacen: (x) => TNP.vTablero(x), preparar: (x) => TNP.vPreparar(x), cargar: (x) => TNP.vCargar(x) })[V.tab](main)
+  ;({ hoy: vHoy, rutas: vRutas, mapa: vMapa, importar: vImportar, informe: vInforme, whatsapp: vWhatsapp, ajustes: vAjustes, ruta: vMiRuta, enviar: vEnviar, almacen: (x) => TNP.vTablero(x), preparar: (x) => TNP.vPreparar(x), cargar: (x) => TNP.vCargar(x), cli: (x) => TNC.vClientes(x), cat: (x) => TNC.vCatalogo(x), ped: (x) => TNC.vPedidos(x) })[V.tab](main)
   if (silencioso) window.scrollTo(0, sy)
 }
 
@@ -288,9 +294,12 @@ function pantallaEntrada(app) {
   <label>Repartidor</label><select id="rep">${S.repartidores.map((r) => `<option>${h(r)}</option>`).join('')}</select>
   <button class="btn big sec" id="rr">🚚 Entrar como repartidor</button>
   <label>Almacén (tu nombre)</label><input id="alm" placeholder="Nombre del preparador" value="${h(localStorage.getItem('tn-alm-nombre') || '')}">
-  <button class="btn big sec" id="al">📦 Entrar en almacén</button></div></div>`
+  <button class="btn big sec" id="al">📦 Entrar en almacén</button>
+  <label>Comercial (tu nombre)</label><input id="com" placeholder="Nombre del comercial" value="${h(localStorage.getItem('tn-com-nombre') || '')}">
+  <button class="btn big sec" id="co">💼 Entrar como comercial</button></div></div>`
   $('#ofi').onclick = () => entrar({ rol: 'oficina', nombre: 'Oficina' })
   $('#rr').onclick = () => entrar({ rol: 'repartidor', nombre: $('#rep').value })
+  $('#co').onclick = () => { const n = $('#com').value.trim(); if (!n) return toast('Escribe tu nombre'); localStorage.setItem('tn-com-nombre', n); entrar({ rol: 'comercial', nombre: n }) }
   $('#al').onclick = () => { const n = $('#alm').value.trim(); if (!n) return toast('Escribe tu nombre'); localStorage.setItem('tn-alm-nombre', n); entrar({ rol: 'almacen', nombre: n }) }
 }
 function entrar(u) { U = u; localStorage.setItem('tn-reparto-user', JSON.stringify(U)); V.tab = null; render(); Nube.bajar() }
@@ -750,5 +759,5 @@ async function waConversacion(tel) {
   const m = await Nube.api('wa_mensajes?select=*&telefono=eq.' + encodeURIComponent(tel) + '&order=at.asc&limit=200')
   modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
 }
-window.TNR = { get S() { return S }, get U() { return U }, V, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha }
+window.TNR = { get S() { return S }, get U() { return U }, V, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
 })()
