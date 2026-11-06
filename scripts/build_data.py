@@ -53,6 +53,7 @@ for a in tpv:
         m = re.search(r'(\d+(?:[.,]\d+)?)\s?(cl|l|lt|ml)\b', a['n'], re.I)
         if m: r['fm'] = m.group(1) + ' ' + m.group(2).lower()
         elif re.search(r'magnum', a['n'], re.I): r['fm'] = '150 cl'
+        elif a.get('vol'): r['fm'] = (f"{a['vol']:g} l".replace('.', ',') if a['vol'] >= 1 else f"{a['vol'] * 100:g} cl".replace('.', ','))
     if not r.get('an'):
         m = re.search(r'\b(19[5-9]\d|20[0-3]\d)\b', a['n'])
         if m: r['an'] = m.group(1)
