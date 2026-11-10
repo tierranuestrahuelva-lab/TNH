@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#830040" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="./assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="TN Central" />
+  <title>TN Central · Tierra Nuestra</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="top">
+    <button id="b-ini" class="ico" aria-label="Inicio" hidden>☰</button>
+    <a href="#/" class="marca"><img src="assets/logo-white.svg" alt="Tierra Nuestra" /><span class="t">Central</span></a>
+    <span id="titulo" class="tit"></span>
+    <span class="sp"></span>
+    <a id="b-nueva" class="ico" href="#" target="_blank" rel="noopener" title="Abrir en ventana aparte" hidden>↗</a>
+    <span id="nube" class="nube" title="Conexión con Sage 50">○ Sage</span>
+  </header>
+  <nav id="dock" class="dock"></nav>
+  <main id="main"></main>
+  <div id="marco" class="marco" hidden></div>
+  <div id="toast" class="toast"></div>
+  <script src="./app.js"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js')</script>
+</body>
+</html>
