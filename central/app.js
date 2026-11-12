@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.0.0'
+const VERSION = '1.0.1'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -49,7 +49,6 @@ const MODULOS = [
   { id: 'croquis', g: 'almacen', n: 'Croquis del almacén', d: 'Plano de zonas y estanterías', url: '../croquis/' },
   { id: 'horarios', g: 'equipo', n: 'Horarios y fichajes', d: 'Turnos, fichar entrada/salida y solicitudes', url: '../horarios/' },
   { id: 'redes', g: 'marketing', n: 'Redes sociales', d: 'Publicaciones e historias de la semana', url: '../redes/2026-11-s1/' },
-  { id: 'specialdays', g: 'marketing', n: 'Special Days', d: 'Campaña de ofertas y reservas', url: '../specialdays/' },
 ]
 // las tres entradas de Reparto son la misma app: se comparte un solo marco
 const marcoDe = (m) => (m.url === '../reparto/' ? 'reparto' : m.id)
