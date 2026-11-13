@@ -78,3 +78,28 @@ ol li,ul li{margin:4px 0}
 .art .ph{position:relative;color:var(--lila)}
 .art .ph svg{width:24px;height:24px}
 .art .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.form select{border:1.5px solid var(--borde);border-radius:10px;padding:10px;background:#fff}
+.tabla{overflow-x:auto;background:#fff;border:1px solid var(--borde);border-radius:14px;margin-top:8px}
+.tabla table{border-collapse:collapse;width:100%;font-size:14px}
+.tabla th,.tabla td{padding:8px 10px;border-bottom:1px solid var(--borde);text-align:left;vertical-align:middle}
+.tabla th{background:#faf6f8;color:var(--vino);font-weight:600;white-space:nowrap}
+.tabla tr.baja td{opacity:.5}
+.tabla td.acc{white-space:nowrap}.tabla td.acc .btn{margin:2px}
+.tabla select,.tabla input:not([type]){border:1px solid var(--borde);border-radius:8px;padding:5px}
+.perm label{display:block;white-space:nowrap;font-size:13px}
+.card.ok{border-color:var(--ok)}
+.clave{font:600 22px/1.4 ui-monospace,Consolas,monospace;letter-spacing:1px;margin:8px 0;color:var(--vino);user-select:all}
+.ia-b{font-weight:700;font-size:13px;border:1.5px solid #fff6;border-radius:10px;padding:4px 9px;margin-right:6px}
+.ia{position:fixed;right:12px;bottom:calc(var(--dock) + 12px);width:min(420px,calc(100vw - 24px));height:min(560px,calc(100vh - var(--top) - var(--dock) - 40px));background:#fff;border:1px solid var(--borde);border-radius:16px;box-shadow:0 12px 40px #0003;display:flex;flex-direction:column;z-index:60}
+.ia[hidden]{display:none}
+.ia-cab{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--borde);color:var(--vino)}
+.ia-cab svg{width:18px;height:18px;vertical-align:-3px}
+.ia-cab .ico{color:var(--gris)}
+.ia-log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ia .msg{padding:9px 12px;border-radius:12px;max-width:92%;font-size:14px;line-height:1.45}
+.ia .msg.a{background:#f6f0f3;align-self:flex-start}.ia .msg.u{background:var(--vino);color:#fff;align-self:flex-end}
+.ia .msg.esp{opacity:.6;font-style:italic}
+.ia-sug{display:flex;flex-wrap:wrap;gap:6px}
+.ia-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--borde)}
+.ia-f input{flex:1;border:1.5px solid var(--borde);border-radius:10px;padding:9px}
+@media (min-width:900px){.ia{bottom:16px}}
