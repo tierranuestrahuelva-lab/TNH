@@ -59,7 +59,6 @@ const MODULOS = [
   { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Clientes, catálogo con tarifas y pedidos (perfil Comercial)', url: '../reparto/' },
   { id: 'ubicaciones', p: 'almacen', g: 'almacen', n: 'Ubicaciones', d: 'Dónde está cada vino: nicheros, almacén y nave', url: '../ubicaciones/' },
   { id: 'preparar', p: 'almacen', g: 'almacen', n: 'Preparar pedidos', d: 'Picking con lector y voz, bultos y carga (perfil Almacén)', url: '../reparto/' },
-  { id: 'croquis', p: 'almacen', g: 'almacen', n: 'Croquis del almacén', d: 'Plano de zonas y estanterías', url: '../croquis/' },
   { id: 'horarios', p: null, g: 'equipo', n: 'Horarios y fichajes', d: 'Turnos, fichar entrada/salida y solicitudes', url: '../horarios/' },
   { id: 'redes', p: 'marketing', g: 'marketing', n: 'Redes sociales', d: 'Publicaciones e historias de la semana', url: '../redes/2026-11-s1/' },
 ]
