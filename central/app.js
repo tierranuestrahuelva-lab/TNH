@@ -565,6 +565,7 @@ async function vistaDatos(id) {
     <div id="resumen" class="estado" style="margin-top:12px"></div><div id="tabla" class="tabla"></div><div id="mas" style="margin-top:10px"></div>`
   const form = $('#filtros')
   let n = 0, filas = [], total = 0, turno = 0
+  const vigente = (t) => t === turno && form.isConnected
   const pinta = () => {
     const cab = D.cabF ? D.cabF() : D.cab
     $('#tabla').innerHTML = filas.length ? `<table><tr>${cab.map((c) => `<th>${c}</th>`).join('')}</tr>${filas.map((r, i) => `<tr class="${D.detalle ? 'clic' : ''}" data-i="${i}">${D.fila(r).map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>` : '<div class="card mut" style="border:0">Nada coincide con estos filtros.</div>'
@@ -585,11 +586,11 @@ async function vistaDatos(id) {
       const res = mas ? null : Nube.todas(base + '&select=' + (D.resSel || D.sel.replace(',lineas', '')))
       let { filas: l, total: tt } = await pag
       if (D.extra) l = await D.extra(l, f)
-      if (t !== turno) return
+      if (!vigente(t)) return
       filas = filas.concat(l); total = tt; n += 100
       pinta()
-      if (res) { const r = await res; if (t === turno) $('#resumen').innerHTML = D.resumen(r) }
-    } catch (e) { if (t === turno) $('#tabla').innerHTML = `<div class="card">No se pudieron leer los datos: ${h(/sin sesión/.test(e.message) ? 'su sesión ha caducado; vuelva a entrar.' : e.message)}</div>` }
+      if (res) { const r = await res; if (vigente(t)) $('#resumen').innerHTML = D.resumen(r) }
+    } catch (e) { if (vigente(t)) $('#tabla').innerHTML = `<div class="card">No se pudieron leer los datos: ${h(/sin sesión/.test(e.message) ? 'su sesión ha caducado; vuelva a entrar.' : e.message)}</div>` }
   }
   let esp
   const cambio = () => { const a = JSON.stringify(f); $$('input,select', form).forEach((el) => (f[el.name] = el.value)); if (JSON.stringify(f) === a) return; LS.set('tn-central-filtros', FILTROS); clearTimeout(esp); esp = setTimeout(() => cargar(), 300) }
