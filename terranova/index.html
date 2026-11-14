@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TerraNova · Tierra Nuestra</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=Fira+Sans+Condensed:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="gate.css">
+</head>
+<body>
+<div id="gate" class="gate">
+  <form id="gate-form" class="gate-box">
+    <img src="icon.svg" alt="" width="56" height="56">
+    <h1>TerraNova</h1>
+    <p>Página privada de Tierra Nuestra. Escribe la contraseña que te han pasado.</p>
+    <input name="clave" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Contraseña" required>
+    <label class="rec"><input type="checkbox" name="recordar" checked> Recordarla en este móvil</label>
+    <button class="btn-big" type="submit">Entrar</button>
+    <p id="gate-msg" class="muted" role="status"></p>
+  </form>
+</div>
+
+<header class="top">
+  <div class="wrap top-in">
+    <img src="logo-white.svg" alt="Tierra Nuestra" class="logo">
+    <div class="brand"><span class="app">TerraNova</span><span class="tag">VINOS DE ESPAÑA</span></div>
+    <div id="sync" class="sync">Cargando datos…</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>¿Para qué te sirvo?</h1>
+    <p class="lead">Piensa en mí como un informático y analista que trabaja solo para Tierra Nuestra. Tú me escribes en español lo que necesitas y yo lo hago: apps, informes, avisos, catálogos, carteles o cuentas.</p>
+    <p class="lead muted">Aquí abajo tienes <strong>tus números de hoy</strong>, sacados de Sage 50 y de tus apps, y al lado de cada uno <strong>ideas concretas</strong>. Si una te sirve, pulsa <em>Copiar encargo</em> y pégamelo en el chat de Devin.</p>
+  </section>
+
+  <section class="band" id="band" aria-label="Resumen de hoy"></section>
+
+  <section>
+    <h2>Tus números y lo que puedo hacer con ellos</h2>
+    <div class="grid" id="areas"></div>
+  </section>
+
+  <section>
+    <h2>Lo que ya tienes funcionando</h2>
+    <p class="muted">Apps que ya hemos hecho juntos. Se abren en el móvil o en el ordenador.</p>
+    <div class="apps" id="apps"></div>
+  </section>
+
+  <section class="how">
+    <h2>Cómo pedirme algo</h2>
+    <ol>
+      <li><strong>Dime el problema, no la solución.</strong> «Pierdo mucho tiempo mirando quién me debe dinero» es perfecto.</li>
+      <li><strong>Te enseño algo rápido</strong> para que lo veas y lo pruebes.</li>
+      <li><strong>Lo vamos mejorando</strong> con lo que me digas. Sage 50 nunca lo toco: solo leo; los cambios los haces tú.</li>
+    </ol>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <span>Datos de solo lectura de Sage 50 (conector cada 10 min) y de las apps de Tierra Nuestra.</span>
+</footer>
+<div id="toast" class="toast" role="status"></div>
+<script src="gate.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
