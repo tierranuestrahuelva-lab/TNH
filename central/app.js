@@ -142,8 +142,8 @@ const Nube = {
 const P = {
   get personal() { return !!Nube.perfil && !Nube.perfil.sinPuesto },
   get gerente() { return Nube.perfil?.rol === 'gerente' },
-  ve(area) { const p = Nube.perfil; if (!p) return true; if (p.sinPuesto) return false; return p.rol === 'gerente' || p.perms.some((x) => x.modulo === area && x.ver) },
-  app(m) { const p = Nube.perfil; if (!p) return true; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
+  ve(area) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return p.rol === 'gerente' || p.perms.some((x) => x.modulo === area && x.ver) },
+  app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
 }
 
 let EST = LS.get('tn-central-estado', null) // último estado leído (se ve aunque no haya cobertura)
@@ -346,11 +346,11 @@ function vistaCuenta() {
   $('#main').innerHTML = `<h1>Mi cuenta</h1>
     <div class="card"><b>${h(p.nombre || p.email)}</b><div class="mut">${h(p.email)} · ${p.sinPuesto ? 'sin puesto asignado' : 'Puesto: ' + h(ROLES[p.rol] || p.rol)}</div></div>
     <h2>Cambiar mi contraseña</h2>
-    <form id="f-clave" class="form"><input id="c1" type="password" placeholder="Nueva contraseña (mínimo 8)" autocomplete="new-password"><input id="c2" type="password" placeholder="Repita la contraseña" autocomplete="new-password"><button class="btn">Guardar</button></form>
+    <form id="f-clave" class="form"><input id="c1" type="password" placeholder="Nueva contraseña (8+, mayúscula, minúscula y número)" autocomplete="new-password"><input id="c2" type="password" placeholder="Repita la contraseña" autocomplete="new-password"><button class="btn">Guardar</button></form>
     <p><button class="btn sec" id="b-salir">Salir de mi usuario en este dispositivo</button></p>`
   $('#f-clave').onsubmit = async (e) => {
     e.preventDefault(); const a = $('#c1').value, b2 = $('#c2').value
-    if (a.length < 8) return toast('Mínimo 8 caracteres'); if (a !== b2) return toast('Las dos contraseñas no coinciden')
+    if (a.length < 8 || !/[a-z]/.test(a) || !/[A-Z]/.test(a) || !/[0-9]/.test(a)) return toast('Mínimo 8 caracteres, con mayúscula, minúscula y número'); if (a !== b2) return toast('Las dos contraseñas no coinciden')
     try { await Nube.cambiarClave(a); toast('Contraseña cambiada'); e.target.reset() } catch (err) { toast(err.message) }
   }
   $('#b-salir').onclick = () => { Nube.salir(); EST = null; pintarNube(); pintarUsuario(); location.hash = '#/' }
