@@ -119,16 +119,18 @@ function pintarNube() { const n = $('#nube'); if (n) n.textContent = nubeTxt() }
 const nubeTxt = () => NUBE ? (Nube.estado === 'ok' ? '● En línea' : '○ ' + Nube.estado) : '● En este dispositivo'
 if (NUBE) setInterval(() => Nube.bajar(), 15000)
 
-// ---------- GPS del repartidor ----------
+// ---------- GPS del repartidor: solo al empezar la ruta, en cada entrega/incidencia y al terminar (no se sigue el recorrido) ----------
 let ultimaPos = null
-function iniciarGPS() {
-  if (!navigator.geolocation || iniciarGPS.on) return
-  iniciarGPS.on = true
-  let ultEnvio = 0
-  navigator.geolocation.watchPosition((p) => {
-    ultimaPos = { lat: p.coords.latitude, lng: p.coords.longitude, at: ahora() }
-    if (Date.now() - ultEnvio > 30000) { ultEnvio = Date.now(); Nube.posicion(ultimaPos.lat, ultimaPos.lng) }
-  }, () => {}, { enableHighAccuracy: true, maximumAge: 15000 })
+const K_JOR = 'tn-reparto-jornada'
+const jornadas = () => JSON.parse(localStorage.getItem(K_JOR) || '{}')
+const jornadaHoy = () => (U ? jornadas()[U.nombre + '|' + hoy()] : null) || {}
+async function marcarRuta(tipo) {
+  const gps = await gpsAhora()
+  const j = jornadas(), k = U.nombre + '|' + hoy()
+  j[k] = Object.assign({}, j[k], { [tipo]: { hora: ahora(), gps } })
+  localStorage.setItem(K_JOR, JSON.stringify(j))
+  if (NUBE && Nube.token) { try { await Nube.api('reparto_estado', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ id: 'jornada:' + U.nombre + ':' + hoy(), valor: Object.assign({ repartidor: U.nombre, fecha: hoy() }, j[k]) }]) }) } catch (e) {} }
+  return gps
 }
 
 // ---------- utilidades UI ----------
@@ -160,8 +162,12 @@ function reducirFoto(file, max = 900) {
 }
 function gpsAhora() {
   return new Promise((res) => {
-    if (!navigator.geolocation) return res(ultimaPos)
-    navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(ultimaPos), { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 })
+    if (!navigator.geolocation) return res(null)
+    navigator.geolocation.getCurrentPosition((p) => {
+      ultimaPos = { lat: p.coords.latitude, lng: p.coords.longitude, at: ahora() }
+      if (U?.rol === 'repartidor') Nube.posicion(ultimaPos.lat, ultimaPos.lng)
+      res({ lat: ultimaPos.lat, lng: ultimaPos.lng })
+    }, () => res(null), { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 })
   })
 }
 
@@ -270,9 +276,8 @@ function render(silencioso) {
   const app = $('#app')
   if (!U) return pantallaEntrada(app)
   if (NUBE && !Nube.token) return pantallaClave(app)
-  if (U.rol === 'repartidor') iniciarGPS()
   const tabs = U.rol === 'oficina'
-    ? [['hoy', 'Albaranes'], ['almacen', 'Almacén'], ['rutas', 'Rutas'], ['mapa', 'Mapa en vivo'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
+    ? [['hoy', 'Albaranes'], ['almacen', 'Almacén'], ['rutas', 'Rutas'], ['mapa', 'Mapa'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
     : U.rol === 'almacen' ? [['preparar', 'Preparar pedidos'], ['cargar', 'Cargar furgoneta']]
     : U.rol === 'comercial' ? [['cli', 'Clientes'], ['cat', 'Catálogo'], ['ped', 'Mis pedidos']]
     : [['ruta', 'Mi ruta'], ['cargar', 'Cargar'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
@@ -419,7 +424,7 @@ let fijar = null
 function vMapa(m) {
   const of = U.rol === 'oficina', l = of ? delDia() : ruta(U.nombre)
   const sin = l.filter((a) => !a.cliente.lat)
-  m.innerHTML = `<div class="row" style="margin-bottom:10px"><h1 class="grow" style="margin:0">${of ? 'Mapa en vivo' : 'Mi ruta en el mapa'}</h1>${of ? selectorFecha() : ''}<button class="btn sm sec" id="rec">↻</button></div>
+  m.innerHTML = `<div class="row" style="margin-bottom:10px"><h1 class="grow" style="margin:0">${of ? 'Mapa · último punto de cada repartidor' : 'Mi ruta en el mapa'}</h1>${of ? selectorFecha() : ''}<button class="btn sm sec" id="rec">↻</button></div>
   <div id="mp" class="map"></div>
   <div class="row mut" style="margin-top:8px">${Object.keys(ESTADOS).map((e) => `<span><span class="pill e-${e}">&nbsp;</span> ${ESTADOS[e]}</span>`).join(' ')}</div>
   ${of && !NUBE ? '<p class="mut">Para ver las furgonetas moviéndose en el mapa hace falta activar la conexión central (Ajustes).</p>' : ''}
@@ -587,17 +592,22 @@ function vMiRuta(m) {
   const fechas = [...new Set(S.albaranes.filter((a) => a.repartidor === U.nombre).map((a) => a.fecha))]
   if (V.fecha !== 'todas' && !fechas.includes(V.fecha) && fechas.length) V.fecha = fechas.includes(hoy()) ? hoy() : fechas.sort().pop()
   const l = ruta(U.nombre), hechas = l.filter(finalizado).length, sig = l.find((a) => !finalizado(a))
-  m.innerHTML = `<div class="row" style="margin-bottom:8px"><h1 class="grow" style="margin:0">Hola, ${h(U.nombre)}</h1>${fechas.length > 1 ? selectorFecha() : `<span class="mut">${fechaES(V.fecha)}</span>`}</div>
+  const jh = jornadaHoy(), deHoy = V.fecha === hoy() && l.length
+  const jor = !deHoy ? '' : !jh.inicio ? `<div class="card" style="border:2px solid var(--vino)"><button class="btn big" id="ini" style="width:100%">▶ Empezar ruta</button><p class="mut" style="margin:6px 0 0">Pulsa al salir. La ubicación se guarda solo al empezar, en cada entrega y al terminar la ruta.</p></div>`
+    : `<div class="mut" style="margin-bottom:8px">▶ Ruta empezada a las ${horaDe(jh.inicio.hora)}${jh.fin ? ` · 🏁 terminada a las ${horaDe(jh.fin.hora)}` : ''}</div>`
+  m.innerHTML = `<div class="row" style="margin-bottom:8px"><h1 class="grow" style="margin:0">Hola, ${h(U.nombre)}</h1>${fechas.length > 1 ? selectorFecha() : `<span class="mut">${fechaES(V.fecha)}</span>`}</div>${jor}
   <div class="card"><div class="row"><b class="grow">${hechas} de ${l.length} paradas</b>${l.length > 1 ? '<button class="btn sm sec" id="opt">⚡ Reordenar desde aquí</button>' : ''}</div><div class="bar" style="margin-top:8px"><i style="width:${l.length ? (hechas / l.length) * 100 : 0}%"></i></div></div>
   ${!l.length ? `<div class="card"><p>No tienes paradas asignadas.</p>${NUBE ? '<p class="mut">Se actualiza sola cuando la oficina te asigne albaranes.</p>' : '<p class="mut">Abre el archivo de ruta que te envíe la oficina por WhatsApp:</p><button class="btn big" id="abrir">📥 Abrir ruta recibida</button>'}</div>` : ''}
   ${sig ? `<div class="card" style="border:2px solid var(--vino)"><div class="mut">SIGUIENTE PARADA</div><h2 style="margin:4px 0">${h(sig.cliente.nombre)}</h2><div>${h(dirTxt(sig.cliente))}</div>${sig.obs ? `<div style="margin-top:4px">📝 ${h(sig.obs)}</div>` : ''}
   <div class="choice" style="margin-top:12px"><a class="btn sec" target="_blank" href="${navURL(sig.cliente)}">🧭 Cómo llegar</a>${sig.cliente.telefono ? `<a class="btn sec" href="tel:${h(sig.cliente.telefono)}">📞 Llamar</a>` : '<span></span>'}</div>
-  <div class="choice" style="margin-top:8px"><button class="btn ok big" data-ent="${sig.id}">✔ Entregar</button><button class="btn ko big" data-inc="${sig.id}">⚠ Incidencia</button></div></div>` : l.length ? '<div class="card" style="text-align:center"><h2>🎉 Ruta terminada</h2><p>Envía el resultado a la oficina.</p></div>' : ''}
+  <div class="choice" style="margin-top:8px"><button class="btn ok big" data-ent="${sig.id}">✔ Entregar</button><button class="btn ko big" data-inc="${sig.id}">⚠ Incidencia</button></div></div>` : l.length ? `<div class="card" style="text-align:center"><h2>🎉 Ruta terminada</h2>${deHoy && !jh.fin ? '<button class="btn big ok" id="fin" style="width:100%">🏁 Terminar ruta</button><p class="mut">Púlsalo al acabar la última parada.</p>' : '<p>Envía el resultado a la oficina.</p>'}</div>` : ''}
   ${l.map((a, i) => `<div class="card stop" data-ver="${a.id}"><div class="num ${a.estado === 'incidencia' ? 'bad' : finalizado(a) ? 'done' : ''}">${finalizado(a) ? (a.estado === 'incidencia' ? '!' : '✓') : i + 1}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">${h(dirTxt(a.cliente))}</div><div class="mut">Alb. ${h(a.numero)} · ${(a.lineas || []).reduce((s, x) => s + (Number(x.unidades) || 0), 0)} uds · ${eur(a.total)}</div></div>${pill(a.estado)}</div>`).join('')}
   ${!NUBE && l.length ? '<button class="btn sec" id="abrir" style="width:100%">📥 Abrir otra ruta recibida</button>' : ''}`
   enlazarFecha()
   if ($('#abrir')) $('#abrir').onclick = async () => { const f = await leerArchivo('.json,application/json'); if (f) importarJSON(await f.text()) }
-  if ($('#opt')) $('#opt').onclick = () => optimizar(U.nombre)
+  if ($('#opt')) $('#opt').onclick = async () => { await gpsAhora(); optimizar(U.nombre) }
+  if ($('#ini')) $('#ini').onclick = async (e) => { e.target.disabled = true; const g = await marcarRuta('inicio'); toast(g ? 'Ruta empezada' : 'Ruta empezada (sin ubicación: revisa el permiso del GPS)'); render() }
+  if ($('#fin')) $('#fin').onclick = async (e) => { e.target.disabled = true; const g = await marcarRuta('fin'); toast(g ? 'Ruta terminada. Ficha tu salida en Horarios.' : 'Ruta terminada (sin ubicación). Ficha tu salida en Horarios.'); render() }
   $$('[data-ent]').forEach((b) => (b.onclick = () => entregar(S.albaranes.find((x) => x.id === b.dataset.ent))))
   $$('[data-inc]').forEach((b) => (b.onclick = () => incidencia(S.albaranes.find((x) => x.id === b.dataset.inc))))
   $$('[data-ver]').forEach((c) => (c.onclick = () => paradaRepartidor(S.albaranes.find((x) => x.id === c.dataset.ver))))
