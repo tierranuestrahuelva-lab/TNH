@@ -103,3 +103,15 @@ ol li,ul li{margin:4px 0}
 .ia-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--borde)}
 .ia-f input{flex:1;border:1.5px solid var(--borde);border-radius:10px;padding:9px}
 @media (min-width:900px){.ia{bottom:16px}}
+.filtros{align-items:center}
+.filtros input.fq{flex:2 1 260px}
+.filtros select,.filtros .ff input{border:1.5px solid var(--borde);border-radius:10px;padding:9px;background:#fff;max-width:100%}
+.filtros .ff{font-size:13px;color:var(--gris);display:inline-flex;align-items:center;gap:6px}
+.filtros .ff input{min-width:0;flex:none}
+.tabla tr.clic{cursor:pointer}.tabla tr.clic:hover td{background:#fcf7fa}
+.tabla tr.det td{background:#faf6f8;font-size:13px;line-height:1.5}
+.tabla tr.det table{font-size:13px;background:#fff;border-radius:8px}
+.tabla td .mut{font-size:12px}
+.ko{color:var(--ko)}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:#f1e6ec;color:var(--vino);white-space:nowrap}.tag.warn{background:#f6e7cc;color:#8a5600}
+.stat b{font-size:22px}
