@@ -51,8 +51,16 @@ function dictar(cb) {
   r.onerror = () => toast('No te he entendido. Prueba otra vez.')
   toast('🎤 Habla ahora…'); try { r.start() } catch (e) {}
 }
-function delDia() { return S.albaranes.filter((a) => !esTicket(a) && (V.fecha === 'todas' || a.fecha === V.fecha)) }
-function ruta(rep) { return delDia().filter((a) => a.repartidor === rep).sort((x, y) => (x.orden || 999) - (y.orden || 999)) }
+const ARRASTRE = 3
+function arrastra(a) {
+  if (V.fecha !== hoy() || !a.fecha || a.fecha >= V.fecha || !['pendiente', 'ruta'].includes(a.estado)) return false
+  const d = new Date(V.fecha + 'T12:00'); d.setDate(d.getDate() - ARRASTRE)
+  return a.fecha >= d.toLocaleDateString('sv-SE')
+}
+function enDia(a) { return V.fecha === 'todas' || a.fecha === V.fecha || arrastra(a) }
+function delDia() { return S.albaranes.filter((a) => !esTicket(a) && (V.q.trim() ? busca(a) : V.fecha === 'todas' || a.fecha === V.fecha)) }
+function conPendientes() { return S.albaranes.filter((a) => !esTicket(a) && (V.q.trim() ? busca(a) : enDia(a))) }
+function ruta(rep) { return conPendientes().filter((a) => a.repartidor === rep).sort((x, y) => (x.fecha || '').localeCompare(y.fecha || '') || (x.orden || 999) - (y.orden || 999)) }
 const finalizado = (a) => ['entregado', 'parcial', 'incidencia'].includes(a.estado)
 
 function fusionar(lista, origen) {
@@ -805,7 +813,7 @@ async function waConversacion(tel) {
   const m = await Nube.api('wa_mensajes?select=*&telefono=eq.' + encodeURIComponent(tel) + '&order=at.asc&limit=200')
   modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
 }
-window.TNR = { get S() { return S }, get U() { return U }, V, busca, fraTxt, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
+window.TNR = { get S() { return S }, get U() { return U }, V, busca, fraTxt, enDia, conPendientes, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
 // Las sesiones guardadas pueden abrir directamente un módulo cargado después de app.js.
 document.addEventListener('DOMContentLoaded', () => {
   render()

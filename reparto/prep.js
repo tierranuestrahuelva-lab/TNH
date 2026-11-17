@@ -58,7 +58,9 @@ function lineas(a) {
   }).sort((a, b) => ZONAS[a.sitio.zona][2] - ZONAS[b.sitio.zona][2] || a.sitio.cod.localeCompare(b.sitio.cod, 'es', { numeric: true }) || a.i - b.i)
 }
 const uni = (n, u) => { const t = { cajas: ['caja', 'cajas'], botellas: ['botella', 'botellas'] }[u] || ['unidad', 'unidades']; return n + ' ' + t[n === 1 ? 0 : 1] }
-const paraPreparar = () => R().delDia().filter((a) => a.lineas?.length && R().busca(a))
+const paraPreparar = () => R().conPendientes().filter((a) => a.lineas?.length && R().busca(a) && (a.fecha === R().V.fecha || R().V.fecha === 'todas' || R().V.q.trim() || est(a) !== 'cargado'))
+const revTxt = (a) => a.prep?.revisado ? `<div class="mut" style="color:var(--ok)">✔ Revisado por ${h(a.prep.revisado.quien)}</div>` : ['preparado', 'cargado'].includes(est(a)) ? '<div class="mut" style="color:var(--warn)">⚠ Sin revisar por un compañero</div>' : ''
+const diaTxt = (a) => a.fecha && a.fecha !== R().V.fecha ? ` · 📅 ${R().fechaES(a.fecha)}` : ''
 function marcar(a, i, cambios, metodo = 'lector') {
   a.prep = a.prep || { estado: 'preparando', l: {} }; a.prep.l = a.prep.l || {}
   const antes = { ...a.prep.l[i] }
@@ -143,18 +145,33 @@ function vPreparar(m) {
   m.innerHTML = `<div class="row" style="margin-bottom:12px"><h1 class="grow" style="margin:0">Pedidos para preparar</h1>${R().selectorFecha()}</div>
   <p><button class="btn sec" id="pk-conteo">Recuento físico frente a Sage</button> <button class="btn sec" id="pk-devoluciones">Seguimiento y devoluciones</button></p>
   ${lista.length ? '' : '<div class="card mut">No hay pedidos con artículos para este día. La oficina los pasa desde la pestaña Almacén (WhatsApp o Sage).</div>'}
-  ${lista.map((a) => { const L = lineas(a), hechas = L.filter((l) => l.hecha).length; return `<div class="card stop" data-pk="${a.id}"><div class="num" style="background:${PCOL[est(a)]}">${hechas}/${L.length}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)} · ${L.length} artículos · 🚚 ${h(a.repartidor || 'sin asignar')}</div>${R().fraTxt(a)}${a.prep?.quien ? `<div class="mut">👤 ${h(a.prep.quien)}</div>` : ''}<div class="bar" style="margin-top:6px"><i style="width:${L.length ? (100 * hechas) / L.length : 0}%"></i></div></div><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span></div>` }).join('')}
+  ${lista.map((a) => { const L = lineas(a), hechas = L.filter((l) => l.hecha).length; return `<div class="card stop" data-pk="${a.id}"><div class="num" style="background:${PCOL[est(a)]}">${hechas}/${L.length}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)}${diaTxt(a)} · ${L.length} artículos · 🚚 ${h(a.repartidor || 'sin asignar')}</div>${R().fraTxt(a)}${a.prep?.quien ? `<div class="mut">👤 ${h(a.prep.quien)}</div>` : ''}${revTxt(a)}${est(a) === 'preparado' && !a.prep?.revisado ? `<button class="btn sm" data-rev="${a.id}" style="margin-top:6px">👀 Revisar pedido</button>` : ''}<div class="bar" style="margin-top:6px"><i style="width:${L.length ? (100 * hechas) / L.length : 0}%"></i></div></div><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span></div>` }).join('')}
   ${sin ? `<div class="mut">${sin} albaranes de este día no traen artículos (llegarán con la conexión a Sage).</div>` : ''}`
   R().enlazarFecha()
   $('#pk-conteo').onclick = () => window.TNTrazabilidad.contar()
   $('#pk-devoluciones').onclick = () => window.TNTrazabilidad.pedidos(paraPreparar())
+  $$('[data-rev]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); revisar(R().S.albaranes.find((x) => x.id === b.dataset.rev)) }))
+  if (R().V.q.trim() && lista.length === 1 && !lista[0].prep?.revisado && est(lista[0]) !== 'cargado') $('#bq').onkeydown = (e) => { if (e.key === 'Enter') $('[data-pk]').click() }
   $$('[data-pk]').forEach((b) => (b.onclick = () => {
     const a = R().S.albaranes.find((x) => x.id === b.dataset.pk)
     if (['preparado', 'cargado'].includes(est(a)) && !confirm('Este pedido ya está preparado. ¿Volver a abrirlo?')) return
-    if (['preparado', 'cargado'].includes(est(a))) { a.prep.cargados = []; delete a.prep.carga_lineas; delete a.prep.cargadoAt }
+    if (['preparado', 'cargado'].includes(est(a))) { a.prep.cargados = []; delete a.prep.carga_lineas; delete a.prep.cargadoAt; delete a.prep.revisado; delete a.prep.cargaSinRevisar }
     a.prep = Object.assign({ l: {} }, a.prep, { estado: 'preparando', quien: R().U.nombre, inicio: a.prep?.inicio || new Date().toISOString() }); R().tocar(a)
     PK = { id: a.id }; R().render(); anunciar(a)
   }))
+}
+function revisar(a) {
+  if (!a) return
+  const L = lineas(a), U = R().U
+  R().modal(`<h2>Revisar pedido</h2><p><b>${h(a.cliente.nombre)}</b><br><span class="mut">Alb. ${h(a.numero)} · preparado por ${h(a.prep?.quien || '—')} · ${a.prep?.bultos || 0} bultos</span></p>
+  <table class="lineas">${L.map((l) => `<tr><td>${l.falta ? '✖' : l.manual ? '✍' : '✔'}</td><td>${h(l.nombre)}</td><td style="white-space:nowrap;text-align:right;color:${l.n < l.cant ? 'var(--ko)' : 'inherit'}"><b>${l.n}</b> / ${h(uni(l.cant, l.unidad))}</td></tr>`).join('')}</table>
+  <p class="mut">✔ leído con el lector · ✍ dado por bueno a mano · ✖ falta</p>
+  <button class="btn big ok" id="rv-ok">✔ Está bien, revisado</button><button class="btn sec" id="rv-re" style="margin-top:8px;width:100%">Hay un error: volver a preparar</button>`)
+  $('#rv-ok').onclick = () => {
+    if (a.prep?.quien && a.prep.quien === U.nombre && !confirm('Lo tiene que revisar un compañero distinto del que lo preparó. ¿Lo das por revisado igualmente?')) return
+    a.prep.revisado = { quien: U.nombre, at: new Date().toISOString() }; R().tocar(a); R().cerrar(); R().render(); R().toast('Pedido revisado: ya se puede cargar')
+  }
+  $('#rv-re').onclick = () => { R().cerrar(); a.prep = Object.assign({ l: {} }, a.prep, { estado: 'preparando', quien: U.nombre, cargados: [] }); delete a.prep.revisado; R().tocar(a); PK = { id: a.id }; R().render(); anunciar(a) }
 }
 function actual(a) { const L = lineas(a); if (PK.cur == null || !L.some((l) => l.i === PK.cur)) PK.cur = L.find((l) => !l.hecha)?.i ?? null; return { L, l: L.find((x) => x.i === PK.cur) } }
 function mover(a, paso) {
@@ -283,6 +300,7 @@ function enlazarFin(a) {
     const N = Number(b.value)
     if (!Number.isSafeInteger(N) || N < 1 || N > 1000) return R().toast('Indica entre 1 y 1000 bultos completos')
     if (L.some((l) => !l.hecha)) return R().toast('Quedan líneas pendientes de revisar')
+    delete a.prep.revisado; delete a.prep.cargaSinRevisar
     Object.assign(a.prep, { estado: 'preparado', bultos: N, fin: new Date().toISOString(), faltas: L.filter((x) => x.falta).map((x) => ({ codigo: x.codigo, nombre: x.nombre, pedidas: x.cant, cogidas: x.n })), cargados: [] })
     R().tocar(a); decir('Pedido terminado.'); if (imp) etiquetas([a]); PK = null; microfono(false); R().render(); R().toast('Pedido preparado')
   }
@@ -312,7 +330,7 @@ function vCargar(m) {
   <div class="choice" style="margin-top:8px"><button id="cg-cam">📷 Cámara</button><button id="cg-tec">⌨ Escribir</button></div>
   <p class="mut">Carga primero lo último que vas a entregar: la lista va de la última parada a la primera.</p>
   <div class="choice" style="grid-template-columns:repeat(3,1fr);margin:10px 0"><button id="cg-ant">Anterior</button><button id="cg-sig">Siguiente</button><button id="cg-mic">Voz ${VOZ.mic ? 'sí' : 'no'}</button></div><p class="mut">«Siguiente» cambia de pedido. «Cargar bulto» pide confirmación para apuntar un bulto sin etiqueta. El lector cuenta directamente etiquetas válidas de esta ruta.</p>
-  ${lista.filter(R().busca).map((a) => { const e = est(a), N = a.prep?.bultos || 0, c = (a.prep?.cargados || []).length; return `<div class="card stop"><div class="num" style="background:${e === 'cargado' ? 'var(--ok)' : ['preparado'].includes(e) ? 'var(--azul)' : 'var(--ko)'}">${a.orden || '·'}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)} · ${PREP[e]}${N ? ` · bultos ${c}/${N}` : ''}</div>${R().fraTxt(a)}${a.prep?.faltas?.length ? `<div style="color:var(--ko);font-size:14px">⚠ Con faltas: ${a.prep.faltas.map((f) => h(f.nombre)).join(', ')}</div>` : ''}</div>${e === 'preparado' ? `<button class="btn sec sm" data-mano="${a.id}">Sin etiqueta</button>` : ''}</div>` }).join('') || '<div class="card mut">No hay pedidos preparados en esta ruta.</div>'}
+  ${lista.filter(R().busca).map((a) => { const e = est(a), N = a.prep?.bultos || 0, c = (a.prep?.cargados || []).length; return `<div class="card stop"><div class="num" style="background:${e === 'cargado' ? 'var(--ok)' : ['preparado'].includes(e) ? 'var(--azul)' : 'var(--ko)'}">${a.orden || '·'}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)}${diaTxt(a)} · ${PREP[e]}${N ? ` · bultos ${c}/${N}` : ''}</div>${R().fraTxt(a)}${revTxt(a)}${a.prep?.faltas?.length ? `<div style="color:var(--ko);font-size:14px">⚠ Con faltas: ${a.prep.faltas.map((f) => h(f.nombre)).join(', ')}</div>` : ''}</div>${e === 'preparado' ? `<button class="btn sec sm" data-mano="${a.id}">Sin etiqueta</button>` : ''}</div>` }).join('') || '<div class="card mut">No hay pedidos preparados en esta ruta.</div>'}
   ${lista.length && lista.every((a) => est(a) === 'cargado') && tot ? '<div class="card" style="text-align:center;border:3px solid var(--ok);font-size:20px;font-weight:700">✅ Furgoneta completa</div>' : ''}`
   R().enlazarFecha()
   if ($('#cg-rep')) $('#cg-rep').onchange = (e) => { CG.rep = e.target.value; CG.msg = null; R().render() }
@@ -354,10 +372,11 @@ function cargar(v, metodo = 'etiqueta') {
   if (!b) return cargaMsg('✖ Eso no es una etiqueta de bulto de Tierra Nuestra.', false, 'Error. No es una etiqueta.')
   const a = b.a
   if (!a) return cargaMsg('✖ Etiqueta de un pedido que no está en la app (¿de otro día?). No lo subas.', false, 'Error. Pedido desconocido.')
-  if (a.repartidor !== CG.rep || (R().V.fecha !== 'todas' && a.fecha !== R().V.fecha)) return cargaMsg(`✖ NO LO SUBAS: es de ${a.cliente.nombre}, ruta de ${a.repartidor || 'sin asignar'} (${R().fechaES(a.fecha)}).`, false, 'Error. Ese bulto es de otra ruta.')
+  if (a.repartidor !== CG.rep || !R().enDia(a)) return cargaMsg(`✖ NO LO SUBAS: es de ${a.cliente.nombre}, ruta de ${a.repartidor || 'sin asignar'} (${R().fechaES(a.fecha)}).`, false, 'Error. Ese bulto es de otra ruta.')
   if (!['preparado', 'cargado'].includes(est(a))) return cargaMsg(`✖ El pedido de ${a.cliente.nombre} no está terminado de preparar.`, false, 'Error. Pedido sin terminar.')
   if (lineas(a).some((l) => l.cambiada)) return cargaMsg('El pedido cambió en Sage. Revisa su preparación antes de cargarlo.', false)
   if (!reglas.etiquetaValida(b.n, b.N, a.prep.bultos)) return cargaMsg('Etiqueta inválida o antigua: el número o el total de bultos no coincide. Reimprime la etiqueta actual.', false)
+  if (!a.prep.revisado && !a.prep.cargaSinRevisar) { CG.pend = { txt: `El pedido de ${a.cliente.nombre} no lo ha revisado ningún compañero. ¿Cargarlo igualmente?`, fn: () => { a.prep.cargaSinRevisar = R().U?.nombre || 'sí'; cargar(v, metodo) } }; decir('Pedido sin revisar. ¿Lo cargo igualmente?'); return }
   a.prep.cargados = a.prep.cargados || []
   if (a.prep.cargados.includes(b.n)) return cargaMsg(`Ese bulto (${b.n} de ${b.N}) de ${a.cliente.nombre} ya estaba cargado.`, false, 'Ya estaba cargado.')
   a.prep.cargados.push(b.n)
