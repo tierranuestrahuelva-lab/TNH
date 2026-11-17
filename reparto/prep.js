@@ -2,6 +2,7 @@
 (function () {
 'use strict'
 const R = () => window.TNR
+const reglas = window.TNAlmacen
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -47,18 +48,24 @@ const tieneCodigo = (c) => Object.values(CB).some((x) => x.c === c)
 
 // ---------- pedido ----------
 const est = (a) => a.prep?.estado || 'pendiente'
+const firmaLinea = (l) => JSON.stringify([String(l.codigo || '').trim(), l.unidad || 'unidades', Number(l.unidades ?? l.cantidad) || 0])
 function lineas(a) {
   return (a.lineas || []).map((l, i) => {
     const p = a.prep?.l?.[i] || {}
-    const x = { i, codigo: String(l.codigo || '').trim(), nombre: l.nombre || l.descripcion || '', cant: Number(l.unidades ?? l.cantidad) || 0, unidad: l.unidad || 'unidades', n: p.n || 0, falta: !!p.falta, manual: !!p.manual }
+    const cambiada = !!p.origen && p.origen !== firmaLinea(l)
+    const x = { i, codigo: String(l.codigo || '').trim(), nombre: l.nombre || l.descripcion || '', cant: Number(l.unidades ?? l.cantidad) || 0, unidad: l.unidad || 'unidades', n: cambiada ? 0 : p.n || 0, falta: !cambiada && !!p.falta, manual: !cambiada && !!p.manual, cambiada }
     x.sitio = sitio(x); x.hecha = x.falta || x.n >= x.cant; return x
   }).sort((a, b) => ZONAS[a.sitio.zona][2] - ZONAS[b.sitio.zona][2] || a.sitio.cod.localeCompare(b.sitio.cod, 'es', { numeric: true }) || a.i - b.i)
 }
 const uni = (n, u) => { const t = { cajas: ['caja', 'cajas'], botellas: ['botella', 'botellas'] }[u] || ['unidad', 'unidades']; return n + ' ' + t[n === 1 ? 0 : 1] }
 const paraPreparar = () => R().delDia().filter((a) => a.lineas?.length)
-function marcar(a, i, cambios) {
+function marcar(a, i, cambios, metodo = 'lector') {
   a.prep = a.prep || { estado: 'preparando', l: {} }; a.prep.l = a.prep.l || {}
-  a.prep.l[i] = Object.assign({}, a.prep.l[i], cambios); R().tocar(a)
+  const antes = { ...a.prep.l[i] }
+  const previo = antes.origen && antes.origen !== firmaLinea(a.lineas[i]) ? {} : antes
+  a.prep.l[i] = Object.assign({}, previo, cambios, { origen: firmaLinea(a.lineas[i]) })
+  a.prep.eventos = [...(a.prep.eventos || []), { at: new Date().toISOString(), quien: R().U?.nombre || '', linea: i, metodo, antes, despues: { ...a.prep.l[i] } }].slice(-500)
+  R().tocar(a)
 }
 
 // ---------- sonido y voz ----------
@@ -87,12 +94,13 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition
 let rec = null, alOir = null
 function microfono(on) {
   VOZ.mic = on && !!SR
-  if (!SR) return R().toast('Este navegador no entiende la voz. Usa Chrome en Android o el ordenador.')
   if (!on) { try { rec?.stop() } catch (e) {} return }
+  if (!SR) return R().toast('Este navegador no entiende la voz. Usa Chrome en Android o el ordenador.')
   if (!rec) {
     rec = new SR(); rec.lang = 'es-ES'; rec.continuous = true; rec.interimResults = false
     rec.onresult = (e) => { if (Date.now() < VOZ.hablando) return; const t = e.results[e.results.length - 1][0].transcript.toLowerCase().trim(); if (alOir) alOir(t) }
-    rec.onend = () => { if (VOZ.mic) setTimeout(() => { try { rec.start() } catch (e) {} }, 300) }
+    rec.onend = () => { if (VOZ.mic) setTimeout(() => { if (!VOZ.mic || document.hidden) return; try { rec.start() } catch (e) {} }, 300) }
+    rec.onerror = (e) => { if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(e.error)) { VOZ.mic = false; R().toast('No se pudo usar el micrófono. Usa los botones o revisa su permiso.'); R().render() } }
   }
   try { rec.start() } catch (e) {}
 }
@@ -133,18 +141,29 @@ function vPreparar(m) {
   const lista = paraPreparar().sort((x, y) => ['preparando', 'pendiente', 'preparado', 'cargado'].indexOf(est(x)) - ['preparando', 'pendiente', 'preparado', 'cargado'].indexOf(est(y)) || (x.repartidor || 'zz').localeCompare(y.repartidor || 'zz') || (y.orden || 0) - (x.orden || 0))
   const sin = R().delDia().filter((a) => !a.lineas?.length).length
   m.innerHTML = `<div class="row" style="margin-bottom:12px"><h1 class="grow" style="margin:0">Pedidos para preparar</h1>${R().selectorFecha()}</div>
+  <p><button class="btn sec" id="pk-conteo">Recuento físico frente a Sage</button> <button class="btn sec" id="pk-devoluciones">Seguimiento y devoluciones</button></p>
   ${lista.length ? '' : '<div class="card mut">No hay pedidos con artículos para este día. La oficina los pasa desde la pestaña Almacén (WhatsApp o Sage).</div>'}
   ${lista.map((a) => { const L = lineas(a), hechas = L.filter((l) => l.hecha).length; return `<div class="card stop" data-pk="${a.id}"><div class="num" style="background:${PCOL[est(a)]}">${hechas}/${L.length}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)} · ${L.length} artículos · 🚚 ${h(a.repartidor || 'sin asignar')}</div>${a.prep?.quien ? `<div class="mut">👤 ${h(a.prep.quien)}</div>` : ''}<div class="bar" style="margin-top:6px"><i style="width:${L.length ? (100 * hechas) / L.length : 0}%"></i></div></div><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span></div>` }).join('')}
   ${sin ? `<div class="mut">${sin} albaranes de este día no traen artículos (llegarán con la conexión a Sage).</div>` : ''}`
   R().enlazarFecha()
+  $('#pk-conteo').onclick = () => window.TNTrazabilidad.contar()
+  $('#pk-devoluciones').onclick = () => window.TNTrazabilidad.pedidos(paraPreparar())
   $$('[data-pk]').forEach((b) => (b.onclick = () => {
     const a = R().S.albaranes.find((x) => x.id === b.dataset.pk)
     if (['preparado', 'cargado'].includes(est(a)) && !confirm('Este pedido ya está preparado. ¿Volver a abrirlo?')) return
+    if (['preparado', 'cargado'].includes(est(a))) { a.prep.cargados = []; delete a.prep.carga_lineas; delete a.prep.cargadoAt }
     a.prep = Object.assign({ l: {} }, a.prep, { estado: 'preparando', quien: R().U.nombre, inicio: a.prep?.inicio || new Date().toISOString() }); R().tocar(a)
     PK = { id: a.id }; R().render(); anunciar(a)
   }))
 }
-function actual(a) { const L = lineas(a); if (PK.cur == null || !L.some((l) => l.i === PK.cur && !l.hecha)) PK.cur = L.find((l) => !l.hecha)?.i ?? null; return { L, l: L.find((x) => x.i === PK.cur) } }
+function actual(a) { const L = lineas(a); if (PK.cur == null || !L.some((l) => l.i === PK.cur)) PK.cur = L.find((l) => !l.hecha)?.i ?? null; return { L, l: L.find((x) => x.i === PK.cur) } }
+function mover(a, paso) {
+  if (PK.pend) return
+  const L = lineas(a).filter((l) => !l.hecha)
+  if (!L.length) { PK.cur = null; return }
+  const i = L.findIndex((l) => l.i === PK.cur)
+  PK.cur = L[(i + paso + L.length) % L.length].i; PK.elegida = null; PK.msg = null; anunciar(a)
+}
 function anunciar(a) {
   const { l } = actual(a); if (!l) return decir('Pedido completo. Indica los bultos.')
   decir(`${l.sitio.cod ? ZONAS[l.sitio.zona][0] + ' ' + deletrear(l.sitio.cod) : 'Sin ubicación'}. ${uni(l.cant - l.n, l.unidad)} de ${l.nombre}`)
@@ -157,23 +176,29 @@ function picking(m, a) {
   const z = l ? ZONAS[l.sitio.zona] : null
   m.innerHTML = `<div class="row" style="margin-bottom:8px"><button class="btn sec sm" id="pk-salir">◀ Pedidos</button><div class="grow"><b>${h(a.cliente.nombre)}</b> <span class="mut">· Alb. ${h(a.numero)}</span></div><span class="mut">${hechas}/${L.length}</span></div>
   <div class="bar" style="margin-bottom:10px"><i style="width:${(100 * hechas) / (L.length || 1)}%"></i></div>
-  ${PK.pend ? `<div class="card" style="border:3px solid var(--warn)"><h2>${h(PK.pend.txt)}</h2><div class="row"><button class="btn ok big grow" id="pk-si" style="width:auto">Sí</button><button class="btn sec big grow" id="pk-no" style="width:auto">No</button></div></div>` : ''}
+  ${PK.pend ? `<div class="card" style="border:3px solid var(--warn)"><h2>${h(PK.pend.txt)}</h2><div class="row">${PK.pend.opciones ? PK.pend.opciones.map((o, i) => `<button class="btn sec big grow" data-opcion="${i}" style="width:auto">${h(o.t)}</button>`).join('') : '<button class="btn ok big grow" id="pk-si" style="width:auto">Sí</button>'}<button class="btn sec big grow" id="pk-no" style="width:auto">Cancelar</button></div></div>` : ''}
   ${PK.msg ? `<div class="card" style="background:${PK.tipo === 'ok' ? '#e7f6ec' : PK.tipo === 'ko' ? '#fde8e8' : '#fff'};border:3px solid ${PK.tipo === 'ok' ? 'var(--ok)' : PK.tipo === 'ko' ? 'var(--ko)' : 'var(--borde)'};font-size:18px;font-weight:600">${h(PK.msg)}</div>` : ''}
   ${l ? `<div class="card" style="text-align:center;padding:18px"><div style="display:inline-block;background:${z[1]};color:#fff;border-radius:12px;padding:8px 18px;font-size:15px;letter-spacing:.08em">${z[0].toUpperCase()}</div>
     <div style="font-size:54px;font-weight:800;color:${z[1]};line-height:1.1;margin:6px 0">${h(l.sitio.cod || '—')}</div>${l.sitio.otras.length ? `<div class="mut">También en: ${l.sitio.otras.map((o) => h(o.cod)).join(', ')}</div>` : ''}
     <div style="font-size:40px;font-weight:800;margin-top:10px">${h(uni(l.cant, l.unidad))}</div><div style="font-size:21px;font-weight:600">${h(l.nombre)}</div><div class="mut">Código ${h(l.codigo || '—')}</div>
     <div style="font-size:26px;margin-top:10px">Leídas: <b style="color:${l.n ? 'var(--ok)' : 'inherit'}">${l.n}</b> de ${l.cant}</div>
+    ${l.cambiada ? '<p style="color:var(--ko)">Esta línea ha cambiado en Sage desde su punteo. Revisa y vuelve a contar sus cantidades.</p>' : ''}
     ${!l.codigo ? '<div class="mut" style="color:var(--warn)">Esta línea no tiene código de artículo: compruébala a mano.</div>' : !tieneCodigo(l.codigo) ? '<div class="mut" style="color:var(--warn)">Este vino aún no tiene código de barras guardado: léelo y te pregunto si es este.</div>' : ''}</div>
   <input id="pk-scan" inputmode="none" autocomplete="off" placeholder="🔫 Lee el código con la pistola (o pulsa ⌨ para escribirlo)" style="font-size:18px;padding:14px;border:2px solid var(--vino)">
   <div class="choice" style="grid-template-columns:repeat(4,1fr);margin-top:8px"><button id="pk-cam">📷 Cámara</button><button id="pk-tec">⌨ Escribir</button><button id="pk-mic" class="${VOZ.mic ? 'on' : ''}">🎤 Voz ${VOZ.mic ? 'sí' : 'no'}</button><button id="pk-alt" class="${VOZ.altavoz ? 'on' : ''}">🔊 ${VOZ.altavoz ? 'Sí' : 'No'}</button></div>
-  <div class="choice" style="grid-template-columns:repeat(4,1fr);margin-top:8px"><button id="pk-rep">🔁 Repetir</button><button id="pk-ant">◀ Anterior</button><button id="pk-fal" style="color:var(--ko)">✖ Falta</button><button id="pk-sig">Siguiente ▶</button></div>
-  ${VOZ.mic ? '<div class="mut" style="margin-top:6px">Di: «repetir», «siguiente», «anterior», «falta», y «sí» o «no» para confirmar.</div>' : ''}`
+  <div class="choice" style="grid-template-columns:repeat(3,1fr);margin-top:8px"><button id="pk-rep">Repetir</button><button id="pk-ant">Anterior</button><button id="pk-sig">Siguiente</button><button id="pk-val" ${l.hecha ? 'disabled' : ''}>Validar sin lector</button><button id="pk-fal" ${l.hecha ? 'disabled' : ''} style="color:var(--ko)">Falta</button></div>
+  <div class="mut" style="margin-top:6px">Escanea cualquier artículo pendiente de este albarán. «Siguiente» y «anterior» solo cambian de línea. «Validar» y «falta» piden confirmación.</div>`
   : fin(a, L)}
-  <div class="card" style="margin-top:12px"><h3>Todo el pedido (en orden de recorrido)</h3><table class="lineas">${L.map((x) => `<tr style="${x.i === PK.cur ? 'background:#f6e9ef' : ''}"><td style="width:70px"><b style="color:${ZONAS[x.sitio.zona][1]}">${h(x.sitio.cod || '—')}</b></td><td>${h(uni(x.cant, x.unidad))} · ${h(x.nombre)}</td><td style="width:70px;text-align:right">${x.falta ? `<b style="color:var(--ko)">FALTA ${x.n}/${x.cant}</b>` : x.hecha ? '<b style="color:var(--ok)">✓</b>' + (x.manual ? ' a mano' : '') : `${x.n}/${x.cant}`}</td></tr>`).join('')}</table></div>`
+  <div class="card" style="margin-top:12px"><h3>Todo el pedido · elige por dónde seguir</h3><table class="lineas">${L.map((x) => `<tr style="${x.i === PK.cur ? 'background:#f6e9ef' : ''}"><td style="width:70px"><b style="color:${ZONAS[x.sitio.zona][1]}">${h(x.sitio.cod || '—')}</b></td><td><button class="btn sec sm" data-linea="${x.i}" ${x.hecha && !x.falta ? 'disabled' : ''}>${h(uni(x.cant, x.unidad))} · ${h(x.nombre)}</button></td><td style="width:70px;text-align:right">${x.falta ? `<b style="color:var(--ko)">FALTA ${x.n}/${x.cant}</b>` : x.hecha ? '<b style="color:var(--ok)">✓</b>' + (x.manual ? ' a mano' : '') : `${x.n}/${x.cant}`}</td></tr>`).join('')}</table></div>`
   const ir = () => R().render()
   $('#pk-salir').onclick = () => { PK = null; microfono(false); alOir = null; ir() }
-  if (PK.pend) { $('#pk-si').onclick = () => { const f = PK.pend.fn; PK.pend = null; f(); ir() }; $('#pk-no').onclick = () => { PK.pend = null; ir() } }
-  if (!l) return enlazarFin(a, L)
+  $$('[data-linea]').forEach((b) => { b.onclick = () => { if (PK.pend) return; const x = L.find((l) => l.i === +b.dataset.linea); if (x.falta) { if (!confirm('¿Reabrir esta falta conservando las unidades leídas?')) return; marcar(a, x.i, { falta: false }, 'reabrir') }; PK.cur = x.i; PK.elegida = x.i; ir(); anunciar(a) } })
+  if (PK.pend) {
+    if ($('#pk-si')) $('#pk-si').onclick = () => { const f = PK.pend.fn; PK.pend = null; f(); ir() }
+    $$('[data-opcion]').forEach((b) => { b.onclick = () => { const f = PK.pend.opciones[+b.dataset.opcion].fn; PK.pend = null; f(); ir() } })
+    $('#pk-no').onclick = () => { PK.pend = null; ir() }
+  }
+  if (!l) { alOir = null; microfono(false); return enlazarFin(a, L) }
   const sc = $('#pk-scan'); const foco = () => { if ($('#modal.hidden') && document.activeElement !== sc && !PK.pend) sc.focus({ preventScroll: true }) }
   sc.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = sc.value.trim(); sc.value = ''; if (v) { leer(a, v); ir() } } }
   setTimeout(foco, 50)
@@ -182,37 +207,47 @@ function picking(m, a) {
   $('#pk-alt').onclick = () => { VOZ.altavoz = !VOZ.altavoz; localStorage.setItem('tn-alm-altavoz', VOZ.altavoz ? 'si' : 'no'); ir() }
   $('#pk-mic').onclick = () => { microfono(!VOZ.mic); ir() }
   $('#pk-rep').onclick = () => anunciar(a)
-  $('#pk-ant').onclick = () => { const i = L.findIndex((x) => x.i === PK.cur); const p = L[i - 1]; if (p) { marcar(a, p.i, { n: 0, falta: false, manual: false }); PK.cur = p.i; PK.msg = 'Vuelves a: ' + p.nombre; PK.tipo = null; ir(); anunciar(a) } }
-  $('#pk-fal').onclick = () => { faltaQ(a, l); ir() }
-  $('#pk-sig').onclick = () => { siguienteQ(a, l); ir() }
+  $('#pk-ant').onclick = () => { mover(a, -1); ir() }
+  $('#pk-fal').onclick = () => { if (!PK.pend && !l.hecha) faltaQ(a, l); ir() }
+  $('#pk-val').onclick = () => { if (!PK.pend && !l.hecha) siguienteQ(a, l); ir() }
+  $('#pk-sig').onclick = () => { mover(a, 1); ir() }
   alOir = (t) => {
-    if (PK.pend) { if (/\b(s[ií]|vale|confirmo|correcto|ok)\b/.test(t)) { const f = PK.pend.fn; PK.pend = null; f() } else if (/\b(no|cancela)/.test(t)) PK.pend = null; else return; return ir() }
+    if (!PK || R().V.tab !== 'preparar') return
+    const c = reglas.comando(t)
+    if (PK.pend) { if (c === 'si' && !PK.pend.opciones) { const f = PK.pend.fn; PK.pend = null; f() } else if (c === 'no') PK.pend = null; else return; return ir() }
     PK.msg = '🎤 «' + t + '»'; PK.tipo = null
-    if (/repet/.test(t)) anunciar(a)
-    else if (/siguiente|listo|hecho/.test(t)) siguienteQ(a, l)
-    else if (/anterior|atr[aá]s/.test(t)) return $('#pk-ant').click()
-    else if (/falta|no hay/.test(t)) faltaQ(a, l)
+    if (c === 'repetir') anunciar(a)
+    else if (c === 'siguiente') mover(a, 1)
+    else if (c === 'validar' && !l.hecha) siguienteQ(a, l)
+    else if (c === 'anterior') mover(a, -1)
+    else if (c === 'falta' && !l.hecha) faltaQ(a, l)
     else return
     ir()
   }
 }
 function sumar(a, l, k) {
+  l = lineas(a).find((x) => x.i === l.i)
+  k = Number(k)
+  if (!l || l.hecha || !Number.isFinite(k) || k <= 0) return aviso('Cantidad o línea no válida.', 'ko')
   if (l.n + k > l.cant) return aviso(`Te pasas: llevas ${l.n} y se piden ${l.cant}. No cojas más.`, 'ko', 'Error. Te pasas.')
   marcar(a, l.i, { n: l.n + k }); const n = l.n + k
-  if (n >= l.cant) { aviso(`✓ Completo: ${uni(l.cant, l.unidad)} de ${l.nombre}`, 'ok'); PK.cur = null; setTimeout(() => anunciar(a), 50) } else aviso(`✓ Bien: ${n} de ${l.cant}`, 'ok', `${n} de ${l.cant}`)
+  if (n >= l.cant) { aviso(`✓ Completo: ${uni(l.cant, l.unidad)} de ${l.nombre}`, 'ok'); if (PK.cur === l.i) PK.cur = null; PK.elegida = null; setTimeout(() => { if (PK) anunciar(a) }, 50) } else aviso(`✓ ${l.nombre}: ${n} de ${l.cant}`, 'ok', `${n} de ${l.cant}`)
 }
 function leer(a, v) {
-  const { L, l } = actual(a); if (!l) return
-  PK.pend = null
+  if (!PK || PK.pend) return
+  const { L, l: actualLinea } = actual(a); if (!actualLinea) return
+  let l = actualLinea
   const info = CB[v]
   if (!info) {
-    if (!l.codigo) return aviso('Código desconocido. Esta línea no tiene código de artículo: compruébala a mano y pulsa Siguiente.', 'ko', 'Código desconocido.')
+    if (!l.codigo) return aviso('Código desconocido. Esta línea no tiene código: compruébala a mano y pulsa Validar.', 'ko', 'Código desconocido.')
     return preguntar(`Código ${v} desconocido. ¿Es de «${l.nombre}»? (solo si lo tienes en la mano)`, () => { guardarCodigo(v, { c: l.codigo, caja: esCaja(v) }); leer(a, v) }, 'Código desconocido. ¿Es de este vino?')
   }
-  if (info.c !== l.codigo) {
-    const otra = L.find((x) => x.codigo === info.c), nom = ART.get(info.c)?.n || info.c
-    return aviso(`✖ ESE NO ES. Has leído «${nom}»${otra ? ' (va en otra línea de este pedido)' : ' (no va en este pedido)'}. Ahora toca: ${l.nombre}`, 'ko', 'Error. Ese no es.')
+  const eleccion = reglas.elegirLinea(L, info.c, PK.elegida)
+  if (eleccion.error) return aviso(eleccion.error === 'completo' ? 'Ese artículo ya no tiene cantidades pendientes en este albarán.' : 'Ese artículo no pertenece a este albarán.', 'ko', 'No lo cojas. No está pendiente.')
+  if (eleccion.opciones) {
+    PK.pend = { txt: 'Este artículo aparece en distintas unidades. Elige en qué línea contar esta lectura.', opciones: eleccion.opciones.map((x) => ({ t: `${uni(x.cant, x.unidad)} · ${x.nombre} (${x.n} leídas)`, fn: () => { PK.elegida = x.i; PK.cur = x.i; leer(a, v) } })) }; decir('Elige cajas o botellas en la pantalla.'); return
   }
+  l = eleccion.linea
   const caja = info.caja ?? esCaja(v)
   if (l.unidad === 'cajas') {
     if (!caja) return preguntar(`Has leído el código de una BOTELLA y se piden CAJAS. ¿Contar 1 caja entera?`, () => sumar(a, l, 1), 'Ojo, es código de botella. ¿Cuento una caja?')
@@ -220,24 +255,18 @@ function leer(a, v) {
   }
   if (caja) {
     if (info.x) return sumar(a, l, info.x)
-    PK.pend = { txt: `Has leído una CAJA. ¿Cuántas botellas trae?`, elegir: true, fn: () => {} }
-    PK.cajaDe = v; decir('Has leído una caja. ¿Cuántas botellas trae?')
-    setTimeout(() => {
-      const box = $('#pk-si')?.parentElement; if (!box) return
-      box.innerHTML = [6, 12, 24, 3, 1].map((n) => `<button class="btn ${n === 1 ? 'sec' : ''} grow" data-x="${n}" style="width:auto">${n === 1 ? 'Era 1 botella' : n}</button>`).join('') + '<button class="btn sec grow" id="pk-no2" style="width:auto">Cancelar</button>'
-      $$('[data-x]', box).forEach((b) => (b.onclick = () => { const x = +b.dataset.x; PK.pend = null; if (x > 1) guardarCodigo(v, { c: l.codigo, caja: true, x }); sumar(a, l, x); R().render() }))
-      $('#pk-no2').onclick = () => { PK.pend = null; R().render() }
-    }, 30)
+    PK.pend = { txt: 'Has leído una caja. ¿Cuántas botellas trae?', opciones: [6, 12, 24, 3, 1].map((x) => ({ t: x === 1 ? 'Era una botella' : `${x} botellas`, fn: () => { if (x <= l.cant - l.n) guardarCodigo(v, { c: l.codigo, caja: x !== 1, x }); sumar(a, l, x) } })) }
+    decir('Has leído una caja. Elige cuántas botellas trae.')
     return
   }
   sumar(a, l, 1)
 }
 function siguienteQ(a, l) {
   if (l.n >= l.cant) return
-  preguntar(`¿Dar por buena «${l.nombre}» sin leer los códigos? (${uni(l.cant, l.unidad)})`, () => { marcar(a, l.i, { n: l.cant, manual: true }); PK.cur = null; aviso('✓ Apuntado a mano: ' + l.nombre, 'ok'); anunciar(a) }, '¿La doy por buena sin leer?')
+  preguntar(`¿Dar por buena «${l.nombre}» sin leer los códigos? (${uni(l.cant, l.unidad)})`, () => { marcar(a, l.i, { n: l.cant, manual: true }, 'validacion_manual'); PK.cur = null; aviso('✓ Apuntado a mano: ' + l.nombre, 'ok'); anunciar(a) }, '¿La doy por buena sin leer?')
 }
 function faltaQ(a, l) {
-  preguntar(`¿Apuntar FALTA de «${l.nombre}»? Llevas ${l.n} de ${l.cant}.`, () => { marcar(a, l.i, { falta: true }); PK.cur = null; aviso(`Falta apuntada: ${l.nombre} (${l.n} de ${l.cant}). La oficina lo verá.`, 'ko'); setTimeout(() => anunciar(a), 50) }, `¿Apunto falta? Llevas ${l.n} de ${l.cant}.`)
+  preguntar(`¿Apuntar FALTA de «${l.nombre}»? Llevas ${l.n} de ${l.cant}.`, () => { marcar(a, l.i, { falta: true }, 'falta_confirmada'); PK.cur = null; aviso(`Falta apuntada: ${l.nombre} (${l.n} de ${l.cant}). La oficina lo verá.`, 'ko'); setTimeout(() => { if (PK) anunciar(a) }, 50) }, `¿Apunto falta? Llevas ${l.n} de ${l.cant}.`)
 }
 function fin(a, L) {
   const faltas = L.filter((x) => x.falta), cajas = L.filter((x) => x.unidad === 'cajas').reduce((s, x) => s + x.n, 0), bot = L.filter((x) => x.unidad !== 'cajas').reduce((s, x) => s + x.n, 0)
@@ -251,49 +280,88 @@ function enlazarFin(a) {
   const b = $('#pk-bultos'); $('#pk-bm').onclick = () => (b.value = Math.max(1, +b.value - 1)); $('#pk-bp').onclick = () => (b.value = +b.value + 1)
   const terminar = (imp) => {
     const L = lineas(a)
-    Object.assign(a.prep, { estado: 'preparado', bultos: Math.max(1, +b.value || 1), fin: new Date().toISOString(), faltas: L.filter((x) => x.falta).map((x) => ({ codigo: x.codigo, nombre: x.nombre, pedidas: x.cant, cogidas: x.n })), cargados: [] })
+    const N = Number(b.value)
+    if (!Number.isSafeInteger(N) || N < 1 || N > 1000) return R().toast('Indica entre 1 y 1000 bultos completos')
+    if (L.some((l) => !l.hecha)) return R().toast('Quedan líneas pendientes de revisar')
+    Object.assign(a.prep, { estado: 'preparado', bultos: N, fin: new Date().toISOString(), faltas: L.filter((x) => x.falta).map((x) => ({ codigo: x.codigo, nombre: x.nombre, pedidas: x.cant, cogidas: x.n })), cargados: [] })
     R().tocar(a); decir('Pedido terminado.'); if (imp) etiquetas([a]); PK = null; microfono(false); R().render(); R().toast('Pedido preparado')
   }
   $('#pk-fin').onclick = () => terminar(true); $('#pk-fin2').onclick = () => terminar(false)
 }
 
 // ---------- CARGAR FURGONETA (punteo de bultos) ----------
-let CG = { rep: '', msg: null, tipo: null }
+let CG = { rep: '', msg: null, tipo: null, cur: null, pend: null, contexto: '' }
 function vCargar(m) {
   const { S, U } = R()
   if (U.rol === 'repartidor') CG.rep = U.nombre
   if (!CG.rep) CG.rep = S.repartidores[0]
   const lista = R().ruta(CG.rep).filter((a) => a.lineas?.length || a.prep).sort((x, y) => (y.orden || 0) - (x.orden || 0))
+  const contexto = CG.rep + '|' + R().V.fecha
+  if (CG.contexto !== contexto) { CG.contexto = contexto; CG.cur = null; CG.pend = null; CG.msg = null }
   const listos = lista.filter((a) => ['preparado', 'cargado'].includes(est(a)))
+  const pendientes = listos.filter((a) => est(a) === 'preparado')
+  if (!pendientes.some((a) => a.id === CG.cur)) CG.cur = pendientes[0]?.id || null
+  const seleccionado = pendientes.find((a) => a.id === CG.cur)
   const tot = listos.reduce((s, a) => s + (a.prep.bultos || 0), 0), cargados = listos.reduce((s, a) => s + (a.prep.cargados || []).length, 0)
   m.innerHTML = `<div class="row" style="margin-bottom:12px"><h1 class="grow" style="margin:0">Cargar furgoneta</h1>${R().selectorFecha()}</div>
   <div class="card row">${U.rol === 'repartidor' ? `<b class="grow">🚚 ${h(CG.rep)}</b>` : `<label>Ruta</label><select id="cg-rep" class="grow" style="width:auto">${S.repartidores.map((r) => `<option ${r === CG.rep ? 'selected' : ''}>${h(r)}</option>`).join('')}</select>`}<b style="font-size:22px">${cargados} / ${tot} bultos</b></div>
   ${CG.msg ? `<div class="card" style="font-size:18px;font-weight:600;background:${CG.tipo === 'ok' ? '#e7f6ec' : '#fde8e8'};border:3px solid ${CG.tipo === 'ok' ? 'var(--ok)' : 'var(--ko)'}">${h(CG.msg)}</div>` : ''}
+  ${CG.pend ? `<div class="card" style="border:3px solid var(--warn)"><h2>${h(CG.pend.txt)}</h2><button class="btn ok big" id="cg-si">Confirmar</button> <button class="btn sec big" id="cg-no">Cancelar</button></div>` : ''}
+  ${seleccionado ? `<div class="card"><b>Seleccionado: ${h(seleccionado.cliente.nombre)}</b><p>Albarán ${h(seleccionado.numero)} · ${(seleccionado.prep.cargados || []).length}/${seleccionado.prep.bultos} bultos</p><button class="btn sec" id="cg-uno">Cargar un bulto sin etiqueta</button></div>` : ''}
   <input id="cg-scan" inputmode="none" autocomplete="off" placeholder="🔫 Lee la etiqueta de cada bulto al subirlo" style="font-size:18px;padding:14px;border:2px solid var(--vino)">
   <div class="choice" style="margin-top:8px"><button id="cg-cam">📷 Cámara</button><button id="cg-tec">⌨ Escribir</button></div>
   <p class="mut">Carga primero lo último que vas a entregar: la lista va de la última parada a la primera.</p>
+  <div class="choice" style="grid-template-columns:repeat(3,1fr);margin:10px 0"><button id="cg-ant">Anterior</button><button id="cg-sig">Siguiente</button><button id="cg-mic">Voz ${VOZ.mic ? 'sí' : 'no'}</button></div><p class="mut">«Siguiente» cambia de pedido. «Cargar bulto» pide confirmación para apuntar un bulto sin etiqueta. El lector cuenta directamente etiquetas válidas de esta ruta.</p>
   ${lista.map((a) => { const e = est(a), N = a.prep?.bultos || 0, c = (a.prep?.cargados || []).length; return `<div class="card stop"><div class="num" style="background:${e === 'cargado' ? 'var(--ok)' : ['preparado'].includes(e) ? 'var(--azul)' : 'var(--ko)'}">${a.orden || '·'}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)} · ${PREP[e]}${N ? ` · bultos ${c}/${N}` : ''}</div>${a.prep?.faltas?.length ? `<div style="color:var(--ko);font-size:14px">⚠ Con faltas: ${a.prep.faltas.map((f) => h(f.nombre)).join(', ')}</div>` : ''}</div>${e === 'preparado' ? `<button class="btn sec sm" data-mano="${a.id}">Sin etiqueta</button>` : ''}</div>` }).join('') || '<div class="card mut">No hay pedidos preparados en esta ruta.</div>'}
-  ${lista.length && cargados === tot && tot ? '<div class="card" style="text-align:center;border:3px solid var(--ok);font-size:20px;font-weight:700">✅ Furgoneta completa</div>' : ''}`
+  ${lista.length && lista.every((a) => est(a) === 'cargado') && tot ? '<div class="card" style="text-align:center;border:3px solid var(--ok);font-size:20px;font-weight:700">✅ Furgoneta completa</div>' : ''}`
   R().enlazarFecha()
   if ($('#cg-rep')) $('#cg-rep').onchange = (e) => { CG.rep = e.target.value; CG.msg = null; R().render() }
   const sc = $('#cg-scan'); setTimeout(() => { if ($('#modal.hidden')) sc.focus({ preventScroll: true }) }, 50)
   sc.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = sc.value.trim(); sc.value = ''; if (v) { cargar(v); R().render() } } }
   $('#cg-tec').onclick = () => { sc.inputMode = sc.inputMode === 'none' ? 'text' : 'none'; sc.blur(); setTimeout(() => sc.focus(), 50) }
   $('#cg-cam').onclick = () => camara((v) => { cargar(v); R().render() })
-  $$('[data-mano]').forEach((b) => (b.onclick = () => { const a = R().S.albaranes.find((x) => x.id === b.dataset.mano); if (!confirm(`¿Cargar los ${a.prep.bultos} bultos de ${a.cliente.nombre} sin leer etiquetas?`)) return; a.prep.cargados = Array.from({ length: a.prep.bultos }, (_, i) => i + 1); cerrarCarga(a); R().render() }))
+  $$('[data-mano]').forEach((b) => { b.textContent = b.dataset.mano === CG.cur ? 'Seleccionado' : 'Seleccionar'; b.onclick = () => { if (CG.pend) return; CG.cur = b.dataset.mano; R().render(); anunciarCarga() } })
+  const moverCarga = (paso) => { if (CG.pend || !pendientes.length) return; const i = pendientes.findIndex((a) => a.id === CG.cur); CG.cur = pendientes[(i + paso + pendientes.length) % pendientes.length].id; R().render(); anunciarCarga() }
+  $('#cg-ant').onclick = () => moverCarga(-1); $('#cg-sig').onclick = () => moverCarga(1)
+  $('#cg-mic').onclick = () => { microfono(!VOZ.mic); R().render() }
+  if ($('#cg-uno')) $('#cg-uno').onclick = cargarUnoQ
+  if (CG.pend) { $('#cg-si').onclick = () => { const f = CG.pend.fn; CG.pend = null; f(); R().render() }; $('#cg-no').onclick = () => { CG.pend = null; R().render() } }
+  alOir = (t) => {
+    if (R().V.tab !== 'cargar') return
+    const c = reglas.comando(t)
+    if (CG.pend) { if (c === 'si') $('#cg-si').click(); else if (c === 'no') $('#cg-no').click(); return }
+    if (c === 'siguiente') moverCarga(1)
+    else if (c === 'anterior') moverCarga(-1)
+    else if (c === 'repetir') anunciarCarga()
+    else if (c === 'cargar' || c === 'validar') cargarUnoQ()
+  }
+}
+function anunciarCarga() { const a = R().S.albaranes.find((a) => a.id === CG.cur); decir(a ? `${a.cliente.nombre}. ${(a.prep.cargados || []).length} de ${a.prep.bultos} bultos cargados.` : 'No quedan pedidos preparados pendientes de cargar.') }
+function cargarUnoQ() {
+  if (CG.pend) return
+  const a = R().S.albaranes.find((a) => a.id === CG.cur)
+  if (!a || est(a) !== 'preparado') return
+  const n = Array.from({ length: a.prep.bultos }, (_, i) => i + 1).find((n) => !(a.prep.cargados || []).includes(n))
+  if (!n) return
+  CG.pend = { txt: `¿Cargar el bulto ${n} de ${a.prep.bultos} de ${a.cliente.nombre} sin leer etiqueta?`, fn: () => cargar(codigoBulto(a, n, a.prep.bultos), 'manual_confirmado') }
+  decir(CG.pend.txt); R().render()
 }
 function cargaMsg(t, ok, voz) { CG.msg = t; CG.tipo = ok ? 'ok' : 'ko'; pitido(ok); decir(voz || t) }
-function cerrarCarga(a) { a.prep.estado = 'cargado'; a.prep.cargadoAt = new Date().toISOString(); if (a.estado === 'pendiente') a.estado = 'ruta'; R().tocar(a) }
-function cargar(v) {
+function cerrarCarga(a) { a.prep.estado = 'cargado'; a.prep.cargadoAt = new Date().toISOString(); const identidades = window.TNTrazabilidad.identificar(a.lineas); a.prep.carga_lineas = lineas(a).map((l) => ({ i: l.i, clave: identidades[l.i].clave, codigo: l.codigo, nombre: l.nombre, unidad: l.unidad, n: a.prep?.l?.[l.i] ? l.n : null })); if (a.estado === 'pendiente') a.estado = 'ruta'; R().tocar(a) }
+function cargar(v, metodo = 'etiqueta') {
+  if (CG.pend) return cargaMsg('Confirma o cancela la operación pendiente antes de otra lectura.', false)
   const b = leerBulto(v)
   if (!b) return cargaMsg('✖ Eso no es una etiqueta de bulto de Tierra Nuestra.', false, 'Error. No es una etiqueta.')
   const a = b.a
   if (!a) return cargaMsg('✖ Etiqueta de un pedido que no está en la app (¿de otro día?). No lo subas.', false, 'Error. Pedido desconocido.')
   if (a.repartidor !== CG.rep || (R().V.fecha !== 'todas' && a.fecha !== R().V.fecha)) return cargaMsg(`✖ NO LO SUBAS: es de ${a.cliente.nombre}, ruta de ${a.repartidor || 'sin asignar'} (${R().fechaES(a.fecha)}).`, false, 'Error. Ese bulto es de otra ruta.')
   if (!['preparado', 'cargado'].includes(est(a))) return cargaMsg(`✖ El pedido de ${a.cliente.nombre} no está terminado de preparar.`, false, 'Error. Pedido sin terminar.')
+  if (lineas(a).some((l) => l.cambiada)) return cargaMsg('El pedido cambió en Sage. Revisa su preparación antes de cargarlo.', false)
+  if (!reglas.etiquetaValida(b.n, b.N, a.prep.bultos)) return cargaMsg('Etiqueta inválida o antigua: el número o el total de bultos no coincide. Reimprime la etiqueta actual.', false)
   a.prep.cargados = a.prep.cargados || []
   if (a.prep.cargados.includes(b.n)) return cargaMsg(`Ese bulto (${b.n} de ${b.N}) de ${a.cliente.nombre} ya estaba cargado.`, false, 'Ya estaba cargado.')
   a.prep.cargados.push(b.n)
+  a.prep.carga_eventos = [...(a.prep.carga_eventos || []), { at: new Date().toISOString(), quien: R().U?.nombre || '', bulto: b.n, metodo }].slice(-500)
   if (a.prep.cargados.length >= a.prep.bultos) { cerrarCarga(a); cargaMsg(`✓ ${a.cliente.nombre}: ${a.prep.bultos} de ${a.prep.bultos}. Pedido cargado.`, true) } else { R().tocar(a); cargaMsg(`✓ ${a.cliente.nombre}: bulto ${b.n} de ${b.N}. Faltan ${a.prep.bultos - a.prep.cargados.length}.`, true, `Bulto ${b.n} de ${b.N}.`) }
 }
 
@@ -323,16 +391,21 @@ function vTablero(m) {
   <div class="card row"><button class="btn" id="tb-wa">📲 Traer pedidos confirmados de WhatsApp</button><button class="btn sec" id="tb-et">🏷 Etiquetas de todos los preparados</button><button class="btn sec" id="tb-art">↻ Actualizar ubicaciones y códigos</button></div>
   ${conF.length ? `<div class="card" style="border:2px solid var(--ko)"><h3 style="color:var(--ko)">⚠ Faltas en la preparación</h3>${conF.map((a) => `<div><b>${h(a.cliente.nombre)}</b> (Alb. ${h(a.numero)}): ${a.prep.faltas.map((f) => `${h(f.nombre)} ${f.cogidas}/${f.pedidas}`).join(' · ')}</div>`).join('')}</div>` : ''}
   <div class="card" style="overflow-x:auto"><table><thead><tr><th>Cliente</th><th>Albarán</th><th>Ruta</th><th>Estado</th><th>Líneas</th><th>Bultos</th><th></th></tr></thead><tbody>
-  ${lista.map((a) => { const L = lineas(a), hh = L.filter((l) => l.hecha).length; return `<tr><td><b>${h(a.cliente.nombre)}</b>${a.origen === 'whatsapp' ? ' <span class="mut">📲</span>' : ''}</td><td>${h(a.numero)}</td><td>${h(a.repartidor || '—')}${a.orden ? ' · ' + a.orden : ''}</td><td><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span>${a.prep?.quien ? `<div class="mut">${h(a.prep.quien)}</div>` : ''}</td><td>${hh}/${L.length}</td><td>${a.prep?.bultos ? `${(a.prep.cargados || []).length}/${a.prep.bultos}` : '—'}</td><td style="white-space:nowrap">${a.prep?.bultos ? `<button class="btn sec sm" data-et="${a.id}">🏷</button> ` : ''}${a.prep ? `<button class="btn sec sm" data-re="${a.id}">↺</button>` : ''}</td></tr>` }).join('') || '<tr><td colspan="7" class="mut">No hay pedidos con artículos este día.</td></tr>'}</tbody></table></div>
+  ${lista.map((a) => { const L = lineas(a), hh = L.filter((l) => l.hecha).length; return `<tr><td><b>${h(a.cliente.nombre)}</b>${a.origen === 'whatsapp' ? ' <span class="mut">📲</span>' : ''}</td><td>${h(a.numero)}</td><td>${h(a.repartidor || '—')}${a.orden ? ' · ' + a.orden : ''}</td><td><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span>${a.prep?.quien ? `<div class="mut">${h(a.prep.quien)}</div>` : ''}</td><td>${hh}/${L.length}</td><td>${a.prep?.bultos ? `${(a.prep.cargados || []).length}/${a.prep.bultos}` : '—'}</td><td style="white-space:nowrap"><button class="btn sec sm" data-trazabilidad="${h(a.id)}">Seguimiento</button> ${a.prep?.bultos ? `<button class="btn sec sm" data-et="${a.id}">🏷</button> ` : ''}${a.prep ? `<button class="btn sec sm" data-re="${a.id}">↺</button>` : ''}</td></tr>` }).join('') || '<tr><td colspan="7" class="mut">No hay pedidos con artículos este día.</td></tr>'}</tbody></table></div>
   ${sinUb.size ? `<div class="card"><h3>Vinos sin ubicación en la app Ubicaciones (${sinUb.size})</h3><div class="mut">${[...sinUb].map(h).join(' · ')}</div></div>` : ''}
   <p class="mut">Los preparadores entran en la app como <b>Almacén</b>. Los albaranes de Sage llegarán con sus artículos cuando esté la conexión de solo lectura.</p>`
   R().enlazarFecha()
   $('#tb-wa').onclick = traerWhatsapp
   $('#tb-et').onclick = () => etiquetas(lista.filter((a) => est(a) === 'preparado'))
   $('#tb-art').onclick = async () => { await cargarArticulos(true); R().toast(`${ART.size} artículos con ubicación cargados`); R().render() }
+  const contar = document.createElement('button'); contar.className = 'btn sec'; contar.id = 'tb-conteo'; contar.textContent = 'Recuento físico frente a Sage'; contar.onclick = () => window.TNTrazabilidad.contar(); $('#tb-art').parentElement.appendChild(contar)
+  $$('[data-trazabilidad]').forEach((b) => { b.onclick = () => window.TNTrazabilidad.informe(R().S.albaranes.find((a) => a.id === b.dataset.trazabilidad)) })
   $$('[data-et]').forEach((b) => (b.onclick = () => etiquetas([R().S.albaranes.find((x) => x.id === b.dataset.et)])))
   $$('[data-re]').forEach((b) => (b.onclick = () => { const a = R().S.albaranes.find((x) => x.id === b.dataset.re); if (!confirm('¿Borrar la preparación de este pedido y empezarlo de cero?')) return; delete a.prep; R().tocar(a); R().render() }))
 }
 
-window.TNP = { codigoDe: (v) => { cargarArticulos(); const x = CB[String(v).trim()]; return x ? Object.assign({ caja: esCaja(String(v).trim()) }, x) : null }, vPreparar, vCargar, vTablero, _leer: leer, _cargar: cargar, _codigoBulto: codigoBulto, _lineas: lineas, enPicking: () => !!PK }
+let ultimaVista = null
+function cambiarVista(tab) { if (tab === ultimaVista) return; ultimaVista = tab; microfono(false); alOir = null; if (tab !== 'preparar') PK = null; if (tab !== 'cargar') CG.pend = null }
+document.addEventListener('visibilitychange', () => { if (document.hidden) microfono(false) })
+window.TNP = { codigoDe: (v) => { cargarArticulos(); const x = CB[String(v).trim()]; return x ? Object.assign({ caja: esCaja(String(v).trim()) }, x) : null }, vPreparar, vCargar, vTablero, cambiarVista, _leer: leer, _cargar: cargar, _codigoBulto: codigoBulto, _lineas: lineas, _firma: firmaLinea, enPicking: () => !!PK }
 })()

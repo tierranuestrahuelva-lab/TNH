@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -86,6 +86,7 @@ const Nube = {
   async authUsuario(email, password) {
     const r = await fetch(SUPA.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: SUPA.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim().toLowerCase(), password }) })
     if (!r.ok) throw new Error('Correo o contraseña incorrectos')
+    reiniciarIA()
     const t = await r.json(); t.exp = Date.now() + t.expires_in * 1000; this.token = t
     await this.cargarPerfil()
   },
@@ -95,9 +96,13 @@ const Nube = {
     const [p] = await this.api('tn_perfiles?select=nombre,rol,agente,activo&user_id=eq.' + uid)
     const perms = p ? await this.api('tn_permisos?select=modulo,ver,editar&rol=eq.' + p.rol) : []
     this.perfil = p && p.activo ? { ...p, email: this.token.user.email, perms } : { sinPuesto: true, email: this.token.user.email, perms: [] }
+    this.preferencias = null
+    if (p?.activo) {
+      try { this.preferencias = (await this.api('tn_preferencias?select=inicio_sencillo,notas_ia&user_id=eq.' + uid))?.[0] || null } catch (e) { /* Compatibilidad hasta instalar la migración 009. */ }
+    }
     return this.perfil
   },
-  salir() { this.token = null; this.perfil = null; localStorage.removeItem('tn-central-estado') },
+  salir() { this.token = null; this.perfil = null; this.preferencias = null; reiniciarIA(); MAE = null; localStorage.removeItem('tn-central-estado'); Object.values(marcos).forEach((f) => f.remove()); Object.keys(marcos).forEach((k) => delete marcos[k]) },
   async renovar() {
     const t = this.token
     if (!t) return false
@@ -144,6 +149,9 @@ const P = {
   ve(area) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return p.rol === 'gerente' || p.perms.some((x) => x.modulo === area && x.ver) },
   app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
 }
+const Personal = window.TNPersonal({ Nube, P, $, h, SVG, toast, pintarEstado, abrirIA, preguntar,
+  preparar: (vista) => { cerrarModulo(); V.sage = false; V.vista = vista; dock() },
+})
 
 let EST = LS.get('tn-central-estado', null) // último estado leído (se ve aunque no haya cobertura)
 let estadoError = ''
@@ -256,6 +264,7 @@ function cerrarModulo() {
 
 function vistaInicio() {
   cerrarModulo(); V.sage = false; V.vista = null; dock()
+  if (Personal.sencillo() && location.hash !== '#/completo') return Personal.inicio()
   const hora = new Date().getHours(), saludo = hora < 14 ? 'Buenos días' : hora < 21 ? 'Buenas tardes' : 'Buenas noches'
   $('#main').innerHTML = `
     <h1>${saludo}${P.personal ? ', ' + h(Nube.perfil.nombre.split(' ')[0]) : ''}</h1>
@@ -284,6 +293,7 @@ function pintarEstado() {
   const el = $('#estado'); if (!el) return
   const s = semaforo()
   const cab = `<div class="card sage" style="margin-top:14px"><span class="luz ${s.c}"></span><div style="flex:1;min-width:200px"><b>${h(s.t)}</b><div class="mut">${h(s.d)}</div>${estadoError === 'red' ? '<div class="mut">Sin cobertura: se muestran los últimos datos leídos.</div>' : ''}</div><a class="btn sm sec" href="#/sage">Ver conexión</a></div>`
+  if (Personal.sencillo() && location.hash !== '#/completo') { el.innerHTML = cab; return }
   if (!Nube.token || !EST) {
     el.innerHTML = cab.replace('<a class="btn sm sec" href="#/sage">Ver conexión</a>', '') + `<form id="f-in" class="form"><input id="em" type="email" placeholder="Su correo (si tiene usuario propio)" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña (o la del equipo de Reparto)" autocomplete="current-password"><button class="btn">Entrar</button></form>`
     $('#f-in').onsubmit = entrar
@@ -344,6 +354,8 @@ function vistaCuenta() {
   if (!p) { location.hash = '#/'; return }
   $('#main').innerHTML = `<h1>Mi cuenta</h1>
     <div class="card"><b>${h(p.nombre || p.email)}</b><div class="mut">${h(p.email)} · ${p.sinPuesto ? 'sin puesto asignado' : 'Puesto: ' + h(ROLES[p.rol] || p.rol)}</div></div>
+    ${P.personal ? '<p><a href="#/personal">Mi inicio y lo que recuerda mi asistente</a></p>' : ''}
+    ${P.personal && P.ve('compras') ? '<p><a href="#/miscompras">Mis borradores de compras</a></p>' : ''}
     <h2>Cambiar mi contraseña</h2>
     <form id="f-clave" class="form"><input id="c1" type="password" placeholder="Nueva contraseña (8+, mayúscula, minúscula y número)" autocomplete="new-password"><input id="c2" type="password" placeholder="Repita la contraseña" autocomplete="new-password"><button class="btn">Guardar</button></form>
     <p><button class="btn sec" id="b-salir">Salir de mi usuario en este dispositivo</button></p>`
@@ -416,7 +428,11 @@ function mostrarClave(email, clave) {
 }
 
 // ---------- IA acompañante ----------
-const IA = { hist: [] }
+const IA = { hist: [], sesion: 0, ocupada: false }
+function reiniciarIA() {
+  IA.hist = []; IA.sesion++; IA.ocupada = false
+  const el = $('#ia'); el.hidden = true; el.innerHTML = ''; delete el.dataset.ok
+}
 function abrirIA() {
   const el = $('#ia'); el.hidden = !el.hidden; if (el.hidden) return
   if (!el.dataset.ok) {
@@ -433,14 +449,20 @@ function abrirIA() {
 }
 async function preguntar(q) {
   q = String(q || '').trim(); if (!q) return
+  if (IA.ocupada) return toast('Espera a que termine la consulta actual')
+  if (!(P.personal && P.ve('ia'))) return toast('Entra con un usuario con acceso al asistente')
+  const sesion = IA.sesion
+  IA.ocupada = true
   const log = $('#ia-log'), inp = $('#ia-q'); inp.value = ''
   log.insertAdjacentHTML('beforeend', `<div class="msg u">${h(q)}</div><div class="msg a esp">Consultando…</div>`); log.scrollTop = log.scrollHeight
   const esp = log.lastElementChild
   try {
     const r = await Nube.fn('tn-copiloto', { pregunta: q, historial: IA.hist })
+    if (sesion !== IA.sesion) return
     IA.hist.push({ role: 'user', content: q }, { role: 'assistant', content: r.respuesta }); IA.hist = IA.hist.slice(-12)
     esp.classList.remove('esp'); esp.innerHTML = h(r.respuesta).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')
-  } catch (e) { esp.classList.remove('esp'); esp.textContent = 'No he podido responder: ' + e.message }
+  } catch (e) { if (sesion !== IA.sesion) return; esp.classList.remove('esp'); esp.textContent = 'No he podido responder: ' + e.message }
+  finally { if (sesion === IA.sesion) IA.ocupada = false }
   log.scrollTop = log.scrollHeight
 }
 
@@ -607,6 +629,8 @@ function ruta() {
   if (hs.startsWith('#/sage')) return vistaSage()
   if (hs.startsWith('#/equipo')) return vistaEquipo()
   if (hs.startsWith('#/cuenta')) return vistaCuenta()
+  if (hs === '#/personal') return Personal.preferencias()
+  if (hs === '#/miscompras') return Personal.compras()
   vistaInicio()
 }
 window.addEventListener('hashchange', ruta)

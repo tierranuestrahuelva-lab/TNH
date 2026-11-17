@@ -274,7 +274,7 @@ function render(silencioso) {
   if (silencioso && V.tab && ['mapa', 'importar', 'ajustes', 'whatsapp', 'cargar', 'cli', 'cat', 'ped'].includes(V.tab)) return
   if (silencioso && V.tab === 'preparar' && window.TNP?.enPicking()) return
   const app = $('#app')
-  if (!U) return pantallaEntrada(app)
+  if (!U) { window.TNP?.cambiarVista(null); return pantallaEntrada(app) }
   if (NUBE && !Nube.token) return pantallaClave(app)
   const tabs = U.rol === 'oficina'
     ? [['hoy', 'Albaranes'], ['almacen', 'Almacén'], ['rutas', 'Rutas'], ['mapa', 'Mapa'], ['importar', 'Sage 50'], ['whatsapp', 'WhatsApp'], ['informe', 'Informe'], ['ajustes', 'Ajustes']]
@@ -282,6 +282,7 @@ function render(silencioso) {
     : U.rol === 'comercial' ? [['cli', 'Clientes'], ['cat', 'Catálogo'], ['ped', 'Mis pedidos']]
     : [['ruta', 'Mi ruta'], ['cargar', 'Cargar'], ['mapa', 'Mapa'], ['enviar', 'Enviar a oficina']]
   if (!V.tab || !tabs.some((t) => t[0] === V.tab)) V.tab = tabs[0][0]
+  window.TNP?.cambiarVista(V.tab)
   const sc = $('main')?.scrollTop, sy = window.scrollY
   app.innerHTML = `<div class="top"><img src="${LOGO}" alt="Tierra Nuestra"><span class="t">Reparto</span><span class="sp"></span><span class="nube" id="nube">${nubeTxt()}</span><button id="salir" title="Cambiar de usuario">${h(U.nombre)} ⏻</button></div>
   <div class="tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${V.tab === k ? 'on' : ''}">${t}</button>`).join('')}</div><main id="main"></main>`
@@ -639,22 +640,28 @@ function entregar(a) {
   <label>Cobro</label><div class="choice" id="e-cob">${COBROS.map((c) => `<button data-c="${c}" class="${c === forma ? 'on' : ''}">${c}</button>`).join('')}</div>
   <div id="e-imp-w" class="col"><label>Importe cobrado €</label><input id="e-imp" type="number" step="0.01" inputmode="decimal" value="${a.total || ''}"></div>
   <label><input type="checkbox" id="e-par" class="chk" style="width:auto;vertical-align:middle"> Entrega parcial (falta algo)</label>
+  ${window.TNTrazabilidad.formularioEntrega(a)}
+  ${a.lineas?.length ? '<button type="button" class="btn sec" id="e-todo">Confirmo que se entrega toda la cantidad de referencia</button>' : ''}
   <label>Nota (opcional)</label><input id="e-not" placeholder="p. ej. dejado en almacén, falta 1 caja…">
   <label>Foto (opcional)</label><input type="file" accept="image/*" capture="environment" id="e-fot"><img id="e-prev" class="foto hidden">
   <button class="btn ok big" id="e-ok">✔ Confirmar entrega</button><button class="btn sec" id="e-x">Cancelar</button></div>`)
   const pad = firmaPad($('#e-fir'))
   const verImp = () => { $('#e-imp-w').style.display = ['Efectivo', 'Tarjeta (TPV)', 'Bizum'].includes(forma) ? '' : 'none' }; verImp()
   $('#e-lim').onclick = pad.limpiar; $('#e-x').onclick = cerrar
+  if ($('#e-todo')) $('#e-todo').onclick = () => window.TNTrazabilidad.confirmarTodo(a)
   $$('#e-cob button').forEach((b) => (b.onclick = () => { forma = b.dataset.c; $$('#e-cob button').forEach((x) => x.classList.toggle('on', x === b)); verImp() }))
   $('#e-fot').onchange = async (e) => { if (e.target.files[0]) { foto = await reducirFoto(e.target.files[0]); $('#e-prev').src = foto; $('#e-prev').classList.remove('hidden') } }
   $('#e-ok').onclick = async () => {
     if (pad.vacio() && !confirm('No hay firma. ¿Confirmar igualmente?')) return
     if (!forma) return toast('Indica el cobro')
-    parcial = $('#e-par').checked
+    let detalleEntrega
+    try { detalleEntrega = window.TNTrazabilidad.leerEntrega(a) } catch (e) { return toast(e.message, 6000) }
+    parcial = $('#e-par').checked || detalleEntrega.parcial
+    if ($('#e-par').checked && !detalleEntrega.parcial && a.lineas?.length) return toast('Indica qué cantidades se entregan y cuáles vuelven')
     if (parcial && !$('#e-not').value.trim()) return toast('Escribe en la nota qué falta')
     $('#e-ok').disabled = true
     const gps = await gpsAhora()
-    a.entrega = { hora: ahora(), receptor: $('#e-rec').value.trim(), firma: pad.vacio() ? null : pad.png(), foto, gps, nota: $('#e-not').value.trim(), cobro: { forma, importe: ['Efectivo', 'Tarjeta (TPV)', 'Bizum'].includes(forma) ? Number($('#e-imp').value) || 0 : 0 } }
+    a.entrega = { hora: ahora(), receptor: $('#e-rec').value.trim(), firma: pad.vacio() ? null : pad.png(), foto, gps, lineas: detalleEntrega.lineas, nota: $('#e-not').value.trim(), cobro: { forma, importe: ['Efectivo', 'Tarjeta (TPV)', 'Bizum'].includes(forma) ? Number($('#e-imp').value) || 0 : 0 } }
     delete a.incidencia; a.estado = parcial ? 'parcial' : 'entregado'; tocar(a); cerrar(); toast('Entrega registrada ✔'); render()
   }
 }
@@ -680,9 +687,6 @@ function vEnviar(m) {
   if ($('#env')) $('#env').onclick = () => compartirArchivo(`entregas-${U.nombre.replace(/\s+/g, '_')}-${V.fecha}.json`, JSON.stringify({ tipo: 'tn-reparto', de: U.nombre, albaranes: l }), 'Entregas de ' + U.nombre)
   if ($('#sync')) $('#sync').onclick = async () => { await Nube.subir(l); await Nube.bajar(); toast('Sincronizado') }
 }
-
-render()
-if (NUBE) Nube.bajar()
 
 // ---------- WhatsApp (chatbot con IA) ----------
 const WA = { pedidos: [], avisos: [], clientes: [], chat: [], filtro: 'confirmado' }
@@ -770,4 +774,9 @@ async function waConversacion(tel) {
   modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
 }
 window.TNR = { get S() { return S }, get U() { return U }, V, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
+// Las sesiones guardadas pueden abrir directamente un módulo cargado después de app.js.
+document.addEventListener('DOMContentLoaded', () => {
+  render()
+  if (NUBE) Nube.bajar()
+}, { once: true })
 })()
