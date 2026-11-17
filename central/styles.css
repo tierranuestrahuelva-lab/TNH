@@ -134,3 +134,14 @@ ol li,ul li{margin:4px 0}
 .ko{color:var(--ko)}
 .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:#f1e6ec;color:var(--vino);white-space:nowrap}.tag.warn{background:#f6e7cc;color:#8a5600}
 .stat b{font-size:22px}
+
+.busca input{padding-right:104px}
+.busca-b{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:4px}
+.busca-b button{width:44px;height:40px;border:0;border-radius:10px;background:#f3ecef;color:var(--vino);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.busca-b button svg{width:22px;height:22px}
+.ia-ini{display:flex;align-items:center;gap:12px;width:100%;margin:6px 0 4px;padding:12px 14px;border:2px solid var(--lila);border-radius:14px;background:#fbf4f8;color:var(--vino);text-align:left;cursor:pointer;font:inherit}
+.ia-ini svg{width:30px;height:30px;flex:none}.ia-ini span{display:flex;flex-direction:column}.ia-ini small{color:var(--gris)}
+.d-ia{color:var(--vino)!important}
+.lector{position:fixed;inset:0;background:#000b;z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
+.lector-c{background:#fff;border-radius:16px;padding:14px;width:min(460px,100%);display:flex;flex-direction:column;gap:10px}
+.lector-c video{width:100%;border-radius:12px;background:#000;aspect-ratio:4/3;object-fit:cover}

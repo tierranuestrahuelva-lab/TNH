@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.4.0'
+const VERSION = '1.5.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -33,6 +33,7 @@ const ICON = {
   inicio: '<path d="M3 11 12 3l9 8M5 10v10h14V10"/>',
   sage: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
   equipo: '<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 4 7"/>',
+  barras: '<path d="M3 5v14M6 5v14M10 5v14M13 5v14M17 5v14M21 5v14M8 5v14M19 5v14" stroke-width="1.4"/>',
   ia: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   vino: '<path d="M10 2h4v4l2 3v12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9l2-3z"/><path d="M8 13h8"/>',
 }
@@ -225,6 +226,31 @@ function buscar(q) {
   const q0 = norm(q)
   return ARTS.filter((a) => t.every((x) => a._t.includes(x))).sort((x, y) => (norm(y.n).startsWith(q0) - norm(x.n).startsWith(q0)) || (x.n.length - y.n.length)).slice(0, 40)
 }
+function dictar(cb) {
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!Rec) return toast('Este navegador no entiende la voz. Use Chrome en Android o en el ordenador.', 4000)
+  const r = new Rec(); r.lang = 'es-ES'; r.interimResults = false; r.maxAlternatives = 1
+  r.onresult = (e) => { let t = e.results[0][0].transcript.trim(); if (/^[\d\s.,-]+$/.test(t)) t = t.replace(/[\s.,]/g, ''); cb(t) }
+  r.onerror = () => toast('No le he entendido. Pruebe otra vez.')
+  toast('🎤 Hable ahora…', 4000); try { r.start() } catch (e) {}
+}
+async function lectorCodigo(cb) {
+  let Det = window.BarcodeDetector
+  if (!Det) { try { Det = (await import('https://cdn.jsdelivr.net/npm/barcode-detector@2.3.1/dist/es/pure.min.js')).BarcodeDetector } catch (e) { return toast('No se ha podido cargar el lector de códigos.') } }
+  const capa = document.createElement('div'); capa.className = 'lector'
+  capa.innerHTML = '<div class="lector-c"><b>Apunte al código de barras</b><video playsinline muted></video><button class="btn sec">Cancelar</button></div>'
+  document.body.appendChild(capa)
+  let st = null, vivo = true
+  const parar = () => { vivo = false; st?.getTracks().forEach((t) => t.stop()); capa.remove() }
+  capa.querySelector('button').onclick = parar
+  try {
+    st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    const v = capa.querySelector('video'); v.srcObject = st; await v.play()
+    const det = new Det({ formats: ['ean_13', 'ean_8', 'code_128', 'itf', 'upc_a', 'upc_e', 'code_39', 'qr_code'] })
+    while (vivo) { const x = await det.detect(v).catch(() => []); if (x[0]) { parar(); return cb(x[0].rawValue) } await new Promise((ok) => setTimeout(ok, 250)) }
+  } catch (e) { parar(); toast('No se ha podido abrir la cámara.') }
+}
+const conIA = () => P.personal && P.ve('ia')
 function tarjeta(a) {
   const foto = '<div class="ph">' + SVG('vino') + (a.im ? ' <img loading="lazy" src="../vinos/img/' + (10000000 + +a.c) + '.jpg" alt="" onerror="this.remove()">' : '') + '</div>'
   return `<div class="art">${foto}<div class="g"><div class="n">${h(a.n)}</div><div class="mut">Cód. ${h(a.c)}${a.d ? ' · ' + h(a.d) : ''}${a.o ? ' · ' + h(a.o) : ''}</div>
@@ -237,7 +263,7 @@ const V = { mod: null }
 const marcos = {}
 function dock() {
   if (P.comercial) {
-    $('#dock').innerHTML = [['#/', 'inicio', 'Inicio', !V.mod && !V.vista], ...(P.app(MOD.horarios) ? [['#/m/horarios', 'horarios', 'Horarios', V.mod?.id === 'horarios']] : []), ...(P.app(MOD.comerciales) ? [['#/m/comerciales', 'comerciales', 'Comerciales', V.vista === 'comerciales']] : []), ['#/cuenta', 'clientes', 'Mi cuenta', V.vista === 'cuenta']].map(([href, e, t, on]) => `<a href="${href}" class="${on ? 'on' : ''}">${SVG(e)}${h(t)}</a>`).join('')
+    $('#dock').innerHTML = [['#/', 'inicio', 'Inicio', !V.mod && !V.vista], ...(P.app(MOD.horarios) ? [['#/m/horarios', 'horarios', 'Horarios', V.mod?.id === 'horarios']] : []), ...(P.app(MOD.comerciales) ? [['#/m/comerciales', 'comerciales', 'Comerciales', V.vista === 'comerciales']] : []), ['#/cuenta', 'clientes', 'Mi cuenta', V.vista === 'cuenta']].map(([href, e, t, on]) => `<a href="${href}" class="${on ? 'on' : ''}">${SVG(e)}${h(t)}</a>`).join('') + dockIA()
     return
   }
   const rec = LS.get('tn-central-recientes', []).filter((id) => MOD[id]).slice(0, 4)
@@ -245,8 +271,10 @@ function dock() {
   const it = [['#/', 'inicio', 'Inicio', !V.mod && !V.sage && !V.vista], ['#/sage', 'sage', 'Sage 50', V.sage]]
     .concat(P.gerente ? [['#/equipo', 'equipo', 'Equipo', V.vista === 'equipo']] : [])
     .concat(rec2.map((id) => [enlace(MOD[id]), id, MOD[id].c || MOD[id].n.split(' ')[0], V.mod?.id === id || V.vista === id]))
-  $('#dock').innerHTML = it.map(([href, e, t, on]) => `<a href="${href}" class="${on ? 'on' : ''}">${SVG(e)}${h(t)}</a>`).join('')
+  $('#dock').innerHTML = it.map(([href, e, t, on]) => `<a href="${href}" class="${on ? 'on' : ''}">${SVG(e)}${h(t)}</a>`).join('') + dockIA()
 }
+function dockIA() { return conIA() ? `<a href="#" class="d-ia">${SVG('ia')}IA</a>` : '' }
+document.addEventListener('click', (e) => { if (e.target.closest?.('.d-ia')) { e.preventDefault(); abrirIA() } })
 function abrirModulo(id, sub) {
   const m = MOD[id]; if (!m) return (location.hash = '#/')
   if (m.v) return (location.hash = enlace(m))
@@ -286,7 +314,8 @@ function vistaInicio() {
     <h1>${saludo}${P.personal ? ', ' + h(Nube.perfil.nombre.split(' ')[0]) : ''}</h1>
     <div class="mut">${P.personal ? 'Puesto: <b>' + h(ROLES[Nube.perfil.rol] || Nube.perfil.rol) + '</b> · <a href="#/cuenta">Mi cuenta</a>' : 'Todas las aplicaciones de Tierra Nuestra en un solo sitio, con los datos de Sage 50.'}</div>
     ${Nube.perfil?.sinPuesto ? '<div class="card" style="margin-top:12px"><b>Su usuario aún no tiene puesto asignado.</b><div class="mut">Pida al gerente que se lo asigne en «Equipo». <a href="#/cuenta">Mi cuenta</a></div></div>' : ''}
-    <div class="busca"><input id="q" type="search" placeholder="Buscar vino o artículo: nombre, código de Sage o código de barras" autocomplete="off" enterkeyhint="search"></div>
+    <div class="busca"><input id="q" type="search" placeholder="Buscar vino o artículo: nombre, código de Sage o código de barras" autocomplete="off" enterkeyhint="search"><span class="busca-b"><button type="button" id="q-mic" title="Buscar hablando" aria-label="Buscar hablando">🎤</button><button type="button" id="q-cam" title="Leer código de barras con la cámara" aria-label="Leer código de barras">${SVG('barras')}</button></span></div>
+    ${conIA() ? `<button class="ia-ini" id="q-ia">${SVG('ia')}<span><b>Pregunte a la IA</b><small>Pedidos, cobros, stock, reparto… por escrito o hablando</small></span></button>` : ''}
     <div id="res" class="res"></div>
     <div id="estado"></div>
     ${GRUPOS.map(([g, t]) => [t, MODULOS.filter((m) => m.g === g && P.app(m))]).filter(([, l]) => l.length).map(([t, l]) => `<h2>${t}</h2><div class="grid">${l.map((m) => `<a class="mod" href="${enlace(m)}" data-mod="${m.id}"><div class="e">${SVG(m.id)}</div><b>${h(m.n)}</b><span>${h(m.d)}</span></a>`).join('')}</div>`).join('')}
@@ -300,6 +329,10 @@ function vistaInicio() {
     res.innerHTML = l.length ? l.map(tarjeta).join('') + (l.length === 40 ? '<div class="mut">Mostrando los 40 primeros: escriba algo más para afinar.</div>' : '') : '<div class="mut">Ningún artículo coincide.</div>'
   }
   q.oninput = pinta
+  const poner = (t) => { q.value = t; sessionStorage.setItem('tn-central-q', t); pinta() }
+  $('#q-mic').onclick = () => dictar(poner)
+  $('#q-cam').onclick = () => lectorCodigo(poner)
+  if ($('#q-ia')) $('#q-ia').onclick = abrirIA
   q.onfocus = () => cargarArticulos().catch(() => {})
   q.value = sessionStorage.getItem('tn-central-q') || ''; if (q.value) pinta()
   q.addEventListener('input', () => sessionStorage.setItem('tn-central-q', q.value))
@@ -489,10 +522,11 @@ function abrirIA() {
     el.innerHTML = `<div class="ia-cab"><b>${SVG('ia')} Asistente</b><button class="ico" id="ia-x" aria-label="Cerrar">✕</button></div>
       <div id="ia-log" class="ia-log"><div class="msg a">Pregúnteme por pedidos pendientes, cartera de cobros, compras por llegar, stock o reparto. Solo le enseño lo que su puesto puede ver y no cambio nada.</div>
       <div class="ia-sug">${['¿Quién me debe dinero?', '¿Qué pedidos de venta faltan por servir?', '¿Qué pedidos de compra faltan por llegar?', '¿Qué falta por reponer?', '¿Cómo va el reparto hoy?'].map((t) => `<button class="btn sm sec">${t}</button>`).join('')}</div></div>
-      <form id="ia-f" class="ia-f"><input id="ia-q" placeholder="Escriba su pregunta…" autocomplete="off"><button class="btn">Enviar</button></form>`
+      <form id="ia-f" class="ia-f"><input id="ia-q" placeholder="Escriba o pulse 🎤 para hablar…" autocomplete="off"><button type="button" class="btn sec" id="ia-mic" title="Preguntar hablando" aria-label="Preguntar hablando">🎤</button><button class="btn">Enviar</button></form>`
     $('#ia-x').onclick = () => (el.hidden = true)
     $$('.ia-sug button', el).forEach((b) => (b.onclick = () => preguntar(b.textContent)))
     $('#ia-f').onsubmit = (e) => { e.preventDefault(); preguntar($('#ia-q').value) }
+    $('#ia-mic').onclick = () => dictar((t) => preguntar(t))
   }
   $('#ia-q').focus()
 }

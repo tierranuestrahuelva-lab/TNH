@@ -22,13 +22,36 @@ const INCID = ['Cerrado', 'Cliente ausente', 'Rechaza la mercancía', 'Falta mer
 const KEY = 'tn-reparto-v1'
 const defecto = () => ({ albaranes: [], repartidores: ['Repartidor 1', 'Repartidor 2'], salida: { nombre: 'Tienda Tierra Nuestra', direccion: 'C/ Fernando el Católico, 34, 21003 Huelva', lat: 37.2563, lng: -6.9483 }, posiciones: {}, ultimaSage: null })
 let S = Object.assign(defecto(), JSON.parse(localStorage.getItem(KEY) || '{}'))
+// los tickets de caja (serie SF) no son de reparto
+const esTicket = (a) => a.origen === 'sage' && /^SF-/.test(a.numero || '')
+S.albaranes = S.albaranes.filter((a) => !(esTicket(a) && a.estado === 'pendiente'))
 let U = JSON.parse(localStorage.getItem('tn-reparto-user') || 'null')
-let V = { tab: null, fecha: hoy(), filtro: 'todos', rep: '' }
+let V = { tab: null, fecha: hoy(), filtro: 'todos', rep: '', q: '' }
 function guardar() {
   try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) { toast('Memoria del móvil llena: envía las entregas a la oficina y borra días antiguos.') }
 }
 function tocar(a) { a.upd = Date.now(); a.porQuien = U?.nombre || ''; guardar(); Nube.subir([a]) }
-function delDia() { return S.albaranes.filter((a) => V.fecha === 'todas' || a.fecha === V.fecha) }
+const nrm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+function busca(a) {
+  const q = nrm(V.q).trim(); if (!q) return true
+  const t = nrm([a.numero, a.factura, a.cliente?.nombre, a.cliente?.codigo, a.cliente?.poblacion, a.cliente?.direccion, a.repartidor].join(' '))
+  const d = q.replace(/\D/g, '')
+  return q.split(/\s+/).every((x) => t.includes(x)) || (d.length >= 3 && d.length === q.replace(/[\s.-]/g, '').length && (String(a.numero || '').replace(/\D/g, '').includes(d) || String(a.factura || '').includes(d)))
+}
+function fraTxt(a) {
+  if (a.factura) return `<span class="fra si">Fra. ${h(a.factura)}</span> ` + (a.pendiente > 0 ? `<span class="fra cob">Cobrar ${eur(a.pendiente)}</span>` : a.pendiente === 0 ? '<span class="fra ok">Nada pendiente</span>' : '')
+  if (a.origen === 'sage' && 'factura' in a) return '<span class="fra no">Sin facturar</span>'
+  return ''
+}
+function dictar(cb) {
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!Rec) return toast('Este navegador no entiende la voz. Usa Chrome en Android o en el ordenador.')
+  const r = new Rec(); r.lang = 'es-ES'; r.interimResults = false; r.maxAlternatives = 1
+  r.onresult = (e) => { let t = e.results[0][0].transcript.trim(); if (/^[\d\s.,-]+$/.test(t)) t = t.replace(/[\s.,]/g, ''); cb(t) }
+  r.onerror = () => toast('No te he entendido. Prueba otra vez.')
+  toast('🎤 Habla ahora…'); try { r.start() } catch (e) {}
+}
+function delDia() { return S.albaranes.filter((a) => !esTicket(a) && (V.fecha === 'todas' || a.fecha === V.fecha)) }
 function ruta(rep) { return delDia().filter((a) => a.repartidor === rep).sort((x, y) => (x.orden || 999) - (y.orden || 999)) }
 const finalizado = (a) => ['entregado', 'parcial', 'incidencia'].includes(a.estado)
 
@@ -36,12 +59,12 @@ function fusionar(lista, origen) {
   let nuevos = 0, act = 0
   const idx = new Map(S.albaranes.map((a) => [a.id, a]))
   for (const n of lista) {
-    if (!n || !n.id) continue
+    if (!n || !n.id || (esTicket(n) && !idx.has(n.id))) continue
     const v = idx.get(n.id)
     if (!v) { S.albaranes.push(n); idx.set(n.id, n); nuevos++; continue }
     if (origen === 'sage') {
       // Sage manda los datos del documento; lo hecho en la calle se conserva
-      Object.assign(v, { cliente: Object.assign({}, v.cliente, n.cliente, v.cliente?.lat ? { lat: v.cliente.lat, lng: v.cliente.lng } : {}), lineas: n.lineas, total: n.total, formaPago: n.formaPago, obs: n.obs, fecha: v.fecha || n.fecha })
+      Object.assign(v, { cliente: Object.assign({}, v.cliente, n.cliente, v.cliente?.lat ? { lat: v.cliente.lat, lng: v.cliente.lng } : {}), lineas: n.lineas, total: n.total, formaPago: n.formaPago, obs: n.obs, fecha: v.fecha || n.fecha }, 'factura' in n ? { factura: n.factura, fechaFactura: n.fechaFactura, pendiente: n.pendiente } : {})
       act++
     } else if ((n.upd || 0) > (v.upd || 0)) { Object.assign(v, n); act++ }
   }
@@ -284,8 +307,17 @@ function render(silencioso) {
   if (!V.tab || !tabs.some((t) => t[0] === V.tab)) V.tab = tabs[0][0]
   window.TNP?.cambiarVista(V.tab)
   const sc = $('main')?.scrollTop, sy = window.scrollY
+  const bqPos = document.activeElement?.id === 'bq' ? document.activeElement.selectionStart : null
+  const conBusca = ['hoy', 'rutas', 'ruta', 'preparar', 'cargar', 'almacen'].includes(V.tab) && !(V.tab === 'preparar' && window.TNP?.enPicking())
   app.innerHTML = `<div class="top"><img src="${LOGO}" alt="Tierra Nuestra"><span class="t">Reparto</span><span class="sp"></span><span class="nube" id="nube">${nubeTxt()}</span><button id="salir" title="Cambiar de usuario">${h(U.nombre)} ⏻</button></div>
-  <div class="tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${V.tab === k ? 'on' : ''}">${t}</button>`).join('')}</div><main id="main"></main>`
+  <div class="tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${V.tab === k ? 'on' : ''}">${t}</button>`).join('')}</div>${conBusca ? `<div class="busca-r"><input id="bq" type="search" enterkeyhint="search" autocomplete="off" placeholder="🔍 Buscar albarán, factura o cliente" value="${h(V.q)}"><button id="bq-mic" title="Buscar hablando" aria-label="Buscar hablando">🎤</button>${V.q ? '<button id="bq-x" aria-label="Borrar búsqueda">✕</button>' : ''}</div>` : ''}<main id="main"></main>`
+  if (conBusca) {
+    const bq = $('#bq')
+    bq.oninput = () => { V.q = bq.value; render() }
+    $('#bq-mic').onclick = () => dictar((t) => { V.q = t; render() })
+    if ($('#bq-x')) $('#bq-x').onclick = () => { V.q = ''; render() }
+    if (bqPos != null) { bq.focus(); bq.setSelectionRange(bqPos, bqPos) }
+  }
   $$('[data-tab]').forEach((b) => (b.onclick = () => { V.tab = b.dataset.tab; render(); window.scrollTo(0, 0) }))
   $('#salir').onclick = () => { if (confirm('¿Cambiar de usuario?')) { U = null; localStorage.removeItem('tn-reparto-user'); render() } }
   const main = $('#main')
@@ -330,7 +362,7 @@ function estadisticas(lista) {
 
 // ----- OFICINA: albaranes -----
 function vHoy(m) {
-  let lista = delDia()
+  let lista = V.q.trim() ? S.albaranes.filter((a) => !esTicket(a) && busca(a)) : delDia()
   if (V.filtro !== 'todos') lista = lista.filter((a) => V.filtro === 'sinasignar' ? !a.repartidor : a.estado === V.filtro)
   lista.sort((x, y) => (x.repartidor || 'zzz').localeCompare(y.repartidor || 'zzz') || (x.orden || 999) - (y.orden || 999))
   const opRep = (sel) => `<option value="">— Sin asignar —</option>` + S.repartidores.map((r) => `<option ${r === sel ? 'selected' : ''}>${h(r)}</option>`).join('')
@@ -343,7 +375,7 @@ function vHoy(m) {
     <button class="btn sm sec" id="nuevo">+ Pedido de última hora</button>
   </div></div>
   <div class="card" style="overflow-x:auto">${lista.length ? `<table><thead><tr><th><input type="checkbox" class="chk" id="todos"></th><th>Albarán</th><th>Cliente</th><th>Dirección</th><th>Total</th><th>Repartidor</th><th>Estado</th><th></th></tr></thead><tbody>
-  ${lista.map((a) => `<tr><td><input type="checkbox" class="chk" data-sel="${a.id}"></td><td><b>${h(a.numero)}</b><div class="mut">${fechaES(a.fecha)}</div></td><td>${h(a.cliente.nombre)}<div class="mut">${h(a.cliente.telefono || '')}</div></td><td>${h(dirTxt(a.cliente))}${a.cliente.lat ? '' : ' <span class="mut">(sin situar)</span>'}</td><td>${eur(a.total)}</td>
+  ${lista.map((a) => `<tr><td><input type="checkbox" class="chk" data-sel="${a.id}"></td><td><b>${h(a.numero)}</b><div class="mut">${fechaES(a.fecha)}</div>${fraTxt(a)}</td><td>${h(a.cliente.nombre)}<div class="mut">${h(a.cliente.telefono || '')}</div></td><td>${h(dirTxt(a.cliente))}${a.cliente.lat ? '' : ' <span class="mut">(sin situar)</span>'}</td><td>${eur(a.total)}</td>
   <td><select data-rep="${a.id}">${opRep(a.repartidor)}</select></td><td>${pill(a.estado)}${a.entrega?.hora ? '<div class="mut">' + horaDe(a.entrega.hora) + '</div>' : ''}</td><td><button class="btn sm sec" data-ver="${a.id}">Ver</button></td></tr>`).join('')}
   </tbody></table>` : `<p class="mut">No hay albaranes para esta fecha. Ve a <b>Sage 50</b> para traerlos, o crea un pedido de última hora.</p>`}</div>`
   enlazarFecha()
@@ -386,7 +418,7 @@ function nuevoPedido() {
 
 function detalle(a) {
   const e = a.entrega || {}, inc = a.incidencia
-  modal(`<div class="row"><h2 class="grow">Albarán ${h(a.numero)}</h2>${pill(a.estado)}</div>
+  modal(`<div class="row"><h2 class="grow">Albarán ${h(a.numero)}</h2>${pill(a.estado)}</div>${fraTxt(a) ? `<div style="margin-bottom:6px">${fraTxt(a)}</div>` : ''}
   <div class="card"><h3>${h(a.cliente.nombre)}</h3><div>${h(dirTxt(a.cliente))}</div><div class="mut">${h(a.cliente.telefono || '')} ${a.cliente.codigo ? '· Cliente ' + h(a.cliente.codigo) : ''}</div>${a.obs ? `<div style="margin-top:6px">📝 ${h(a.obs)}</div>` : ''}</div>
   ${tablaLineas(a)}
   ${e.hora ? `<div class="card"><h3>Entrega</h3><div>${horaDe(e.hora)} · ${h(a.repartidor)} · Recibe: <b>${h(e.receptor || '')}</b></div>${e.cobro ? `<div>Cobro: <b>${h(e.cobro.forma)}</b> ${e.cobro.importe ? eur(e.cobro.importe) : ''}</div>` : ''}${e.nota ? `<div>📝 ${h(e.nota)}</div>` : ''}${e.firma ? `<img class="foto" src="${e.firma}" style="background:#fff;border:1px solid var(--borde)">` : ''}${e.foto ? `<img class="foto" src="${e.foto}">` : ''}</div>` : ''}
@@ -408,7 +440,7 @@ function vRutas(m) {
     return `<div class="card"><div class="row"><h2 class="grow" style="margin:0">🚚 ${h(r)}</h2><span class="mut">${hechas}/${l.length} hechas</span>
     <button class="btn sm" data-opt="${h(r)}">⚡ Optimizar ruta</button>${NUBE ? '' : `<button class="btn sm sec" data-env="${h(r)}">📤 Enviar ruta al móvil</button>`}</div>
     <div class="bar" style="margin:10px 0"><i style="width:${l.length ? (hechas / l.length) * 100 : 0}%"></i></div>
-    ${l.length ? l.map((a, i) => `<div class="row" style="padding:6px 0;border-top:1px solid var(--borde)"><div class="num ${a.estado === 'incidencia' ? 'bad' : finalizado(a) ? 'done' : ''}">${i + 1}</div><div class="grow"><b>${h(a.cliente.nombre)}</b> <span class="mut">· ${h(a.numero)}</span><div class="mut">${h(dirTxt(a.cliente))}</div></div>${pill(a.estado)}
+    ${l.length ? l.map((a, i) => !busca(a) ? '' : `<div class="row" style="padding:6px 0;border-top:1px solid var(--borde)"><div class="num ${a.estado === 'incidencia' ? 'bad' : finalizado(a) ? 'done' : ''}">${i + 1}</div><div class="grow"><b>${h(a.cliente.nombre)}</b> <span class="mut">· ${h(a.numero)}</span> ${fraTxt(a)}<div class="mut">${h(dirTxt(a.cliente))}</div></div>${pill(a.estado)}
     <button class="btn sm sec" data-up="${a.id}" ${i === 0 ? 'disabled' : ''}>▲</button><button class="btn sm sec" data-down="${a.id}" ${i === l.length - 1 ? 'disabled' : ''}>▼</button></div>`).join('') : '<p class="mut">Sin paradas asignadas. Asígnalas en Albaranes.</p>'}</div>` }).join('')}
   ${delDia().filter((a) => !a.repartidor).length ? `<div class="card"><b>${delDia().filter((a) => !a.repartidor).length}</b> albaranes sin repartidor. Asígnalos en <b>Albaranes</b>.</div>` : ''}`
   enlazarFecha()
@@ -602,7 +634,7 @@ function vMiRuta(m) {
   ${sig ? `<div class="card" style="border:2px solid var(--vino)"><div class="mut">SIGUIENTE PARADA</div><h2 style="margin:4px 0">${h(sig.cliente.nombre)}</h2><div>${h(dirTxt(sig.cliente))}</div>${sig.obs ? `<div style="margin-top:4px">📝 ${h(sig.obs)}</div>` : ''}
   <div class="choice" style="margin-top:12px"><a class="btn sec" target="_blank" href="${navURL(sig.cliente)}">🧭 Cómo llegar</a>${sig.cliente.telefono ? `<a class="btn sec" href="tel:${h(sig.cliente.telefono)}">📞 Llamar</a>` : '<span></span>'}</div>
   <div class="choice" style="margin-top:8px"><button class="btn ok big" data-ent="${sig.id}">✔ Entregar</button><button class="btn ko big" data-inc="${sig.id}">⚠ Incidencia</button></div></div>` : l.length ? `<div class="card" style="text-align:center"><h2>🎉 Ruta terminada</h2>${deHoy && !jh.fin ? '<button class="btn big ok" id="fin" style="width:100%">🏁 Terminar ruta</button><p class="mut">Púlsalo al acabar la última parada.</p>' : '<p>Envía el resultado a la oficina.</p>'}</div>` : ''}
-  ${l.map((a, i) => `<div class="card stop" data-ver="${a.id}"><div class="num ${a.estado === 'incidencia' ? 'bad' : finalizado(a) ? 'done' : ''}">${finalizado(a) ? (a.estado === 'incidencia' ? '!' : '✓') : i + 1}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">${h(dirTxt(a.cliente))}</div><div class="mut">Alb. ${h(a.numero)} · ${(a.lineas || []).reduce((s, x) => s + (Number(x.unidades) || 0), 0)} uds · ${eur(a.total)}</div></div>${pill(a.estado)}</div>`).join('')}
+  ${l.map((a, i) => !busca(a) ? '' : `<div class="card stop" data-ver="${a.id}"><div class="num ${a.estado === 'incidencia' ? 'bad' : finalizado(a) ? 'done' : ''}">${finalizado(a) ? (a.estado === 'incidencia' ? '!' : '✓') : i + 1}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">${h(dirTxt(a.cliente))}</div><div class="mut">Alb. ${h(a.numero)} · ${(a.lineas || []).reduce((s, x) => s + (Number(x.unidades) || 0), 0)} uds · ${eur(a.total)}</div>${fraTxt(a)}</div>${pill(a.estado)}</div>`).join('')}
   ${!NUBE && l.length ? '<button class="btn sec" id="abrir" style="width:100%">📥 Abrir otra ruta recibida</button>' : ''}`
   enlazarFecha()
   if ($('#abrir')) $('#abrir').onclick = async () => { const f = await leerArchivo('.json,application/json'); if (f) importarJSON(await f.text()) }
@@ -615,7 +647,7 @@ function vMiRuta(m) {
 }
 function paradaRepartidor(a) {
   if (finalizado(a)) return detalle(a)
-  modal(`<div class="row"><h2 class="grow">${h(a.cliente.nombre)}</h2>${pill(a.estado)}</div><div>${h(dirTxt(a.cliente))}</div>${a.obs ? `<div>📝 ${h(a.obs)}</div>` : ''}
+  modal(`<div class="row"><h2 class="grow">${h(a.cliente.nombre)}</h2>${pill(a.estado)}</div><div>${h(dirTxt(a.cliente))}</div><div class="mut">Albarán ${h(a.numero)} · ${eur(a.total)} ${fraTxt(a)}</div>${a.obs ? `<div>📝 ${h(a.obs)}</div>` : ''}
   ${tablaLineas(a)}
   <div class="choice"><a class="btn sec" target="_blank" href="${navURL(a.cliente)}">🧭 Cómo llegar</a>${a.cliente.telefono ? `<a class="btn sec" href="tel:${h(a.cliente.telefono)}">📞 Llamar</a>` : '<span></span>'}<button class="btn ok big" id="p-ent">✔ Entregar</button><button class="btn ko big" id="p-inc">⚠ Incidencia</button></div>
   <button class="btn sec" style="width:100%;margin-top:8px" id="p-x">Cerrar</button>`)
@@ -633,12 +665,12 @@ function firmaPad(cv) {
 }
 function entregar(a) {
   let forma = /contado|efectivo/i.test(a.formaPago || '') ? 'Efectivo' : (a.formaPago ? 'Ya pagado / a crédito' : ''), foto = null, parcial = false
-  modal(`<h2>Entregar · ${h(a.cliente.nombre)}</h2><div class="mut">Albarán ${h(a.numero)} · ${eur(a.total)}${a.formaPago ? ' · ' + h(a.formaPago) : ''}</div>
+  modal(`<h2>Entregar · ${h(a.cliente.nombre)}</h2><div class="mut">Albarán ${h(a.numero)} · ${eur(a.total)}${a.formaPago ? ' · ' + h(a.formaPago) : ''}</div>${fraTxt(a) ? `<div style="margin-top:4px">${fraTxt(a)}</div>` : ''}
   <div class="col" style="margin-top:12px">
   <label>¿Quién recibe?</label><input id="e-rec" placeholder="Nombre de quien recibe">
   <label>Firma del cliente</label><canvas class="firma" id="e-fir"></canvas><button class="btn sm sec" id="e-lim" style="align-self:flex-start">Borrar firma</button>
   <label>Cobro</label><div class="choice" id="e-cob">${COBROS.map((c) => `<button data-c="${c}" class="${c === forma ? 'on' : ''}">${c}</button>`).join('')}</div>
-  <div id="e-imp-w" class="col"><label>Importe cobrado €</label><input id="e-imp" type="number" step="0.01" inputmode="decimal" value="${a.total || ''}"></div>
+  <div id="e-imp-w" class="col"><label>Importe cobrado €</label><input id="e-imp" type="number" step="0.01" inputmode="decimal" value="${a.pendiente > 0 ? a.pendiente : a.total || ''}"></div>
   <label><input type="checkbox" id="e-par" class="chk" style="width:auto;vertical-align:middle"> Entrega parcial (falta algo)</label>
   ${window.TNTrazabilidad.formularioEntrega(a)}
   ${a.lineas?.length ? '<button type="button" class="btn sec" id="e-todo">Confirmo que se entrega toda la cantidad de referencia</button>' : ''}
@@ -773,7 +805,7 @@ async function waConversacion(tel) {
   const m = await Nube.api('wa_mensajes?select=*&telefono=eq.' + encodeURIComponent(tel) + '&order=at.asc&limit=200')
   modal(`<h2>Conversación con ${h(tel)}</h2><div style="max-height:60vh;overflow:auto">${(m || []).map((x) => `<div style="margin:4px 0;text-align:${x.sentido === 'out' ? 'left' : 'right'}"><span style="display:inline-block;max-width:85%;white-space:pre-wrap;padding:6px 10px;border-radius:10px;background:${x.sentido === 'out' ? '#f1e6ee' : '#dcf8c6'}">${h(x.texto || '[' + x.tipo + ']')}</span><div style="font-size:11px;color:#888">${new Date(x.at).toLocaleString('es-ES')}</div></div>`).join('')}</div><button class="btn" id="wa-cerrar">Cerrar</button>`); $("#wa-cerrar").onclick = cerrar
 }
-window.TNR = { get S() { return S }, get U() { return U }, V, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
+window.TNR = { get S() { return S }, get U() { return U }, V, busca, fraTxt, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
 // Las sesiones guardadas pueden abrir directamente un módulo cargado después de app.js.
 document.addEventListener('DOMContentLoaded', () => {
   render()
