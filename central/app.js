@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.3.0'
+const VERSION = '1.4.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -56,7 +56,7 @@ const MODULOS = [
   { id: 'club', p: 'ventas', g: 'venta', n: 'Club de Vinos', d: 'Altas de socios y exportación a Sage', url: '../club/' },
   { id: 'reparto', p: 'reparto', g: 'pedidos', n: 'Reparto y oficina', d: 'Albaranes de Sage, rutas, entregas y cobros', url: '../reparto/' },
   { id: 'whatsapp', p: 'ventas', g: 'pedidos', n: 'Pedidos WhatsApp', d: 'Pedidos del chatbot (en Reparto › Oficina › WhatsApp)', url: '../reparto/' },
-  { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Clientes, catálogo con tarifas y pedidos (perfil Comercial)', url: '../reparto/' },
+  { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Enviar catálogos sin precios y consultar clientes y pedidos', url: '../reparto/' },
   { id: 'ubicaciones', p: 'almacen', g: 'almacen', n: 'Ubicaciones', d: 'Dónde está cada vino: nicheros, almacén y nave', url: '../ubicaciones/' },
   { id: 'preparar', p: 'almacen', g: 'almacen', n: 'Preparar pedidos', d: 'Picking con lector y voz, bultos y carga (perfil Almacén)', url: '../reparto/' },
   { id: 'horarios', p: null, g: 'equipo', n: 'Horarios y fichajes', d: 'Turnos, fichar entrada/salida y solicitudes', url: '../horarios/' },
@@ -109,7 +109,11 @@ const Nube = {
     if (Date.now() < t.exp - 60000) return true
     const r = await fetch(SUPA.url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: SUPA.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: t.refresh_token }) }).catch(() => null)
     if (!r) throw new Error('sin conexión')
-    if (!r.ok) { this.token = null; return false }
+    if (!r.ok) {
+      this.salir(); EST = null; pintarUsuario(); pintarNube()
+      location.hash = '#/'; ruta()
+      return false
+    }
     const n = await r.json(); n.exp = Date.now() + n.expires_in * 1000; this.token = n; return true
   },
   async api(path, metodo = 'GET', datos) {
@@ -146,6 +150,7 @@ const Nube = {
 const P = {
   get personal() { return !!Nube.perfil && !Nube.perfil.sinPuesto },
   get gerente() { return Nube.perfil?.rol === 'gerente' },
+  get comercial() { return this.personal && Nube.perfil.rol === 'comercial' },
   ve(area) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return p.rol === 'gerente' || p.perms.some((x) => x.modulo === area && x.ver) },
   app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
 }
@@ -231,6 +236,10 @@ function tarjeta(a) {
 const V = { mod: null }
 const marcos = {}
 function dock() {
+  if (P.comercial) {
+    $('#dock').innerHTML = [['#/', 'inicio', 'Inicio', !V.mod && !V.vista], ...(P.app(MOD.horarios) ? [['#/m/horarios', 'horarios', 'Horarios', V.mod?.id === 'horarios']] : []), ...(P.app(MOD.comerciales) ? [['#/m/comerciales', 'comerciales', 'Comerciales', V.vista === 'comerciales']] : []), ['#/cuenta', 'clientes', 'Mi cuenta', V.vista === 'cuenta']].map(([href, e, t, on]) => `<a href="${href}" class="${on ? 'on' : ''}">${SVG(e)}${h(t)}</a>`).join('')
+    return
+  }
   const rec = LS.get('tn-central-recientes', []).filter((id) => MOD[id]).slice(0, 4)
   const rec2 = rec.filter((id) => P.app(MOD[id]))
   const it = [['#/', 'inicio', 'Inicio', !V.mod && !V.sage && !V.vista], ['#/sage', 'sage', 'Sage 50', V.sage]]
@@ -242,6 +251,7 @@ function abrirModulo(id, sub) {
   const m = MOD[id]; if (!m) return (location.hash = '#/')
   if (m.v) return (location.hash = enlace(m))
   if (!P.app(m)) { toast('Su puesto no tiene acceso a ' + m.n); return (location.hash = '#/') }
+  if (id === 'comerciales' && sub !== 'pedidos') return vistaComerciales()
   V.mod = m; V.sage = false; V.vista = null
   const rec = LS.get('tn-central-recientes', []).filter((x) => x !== id); rec.unshift(id); LS.set('tn-central-recientes', rec.slice(0, 6))
   const k = marcoDe(m), src = m.url + (sub ? '#/' + sub : '')
@@ -266,6 +276,12 @@ function vistaInicio() {
   cerrarModulo(); V.sage = false; V.vista = null; dock()
   if (Personal.sencillo() && location.hash !== '#/completo') return Personal.inicio()
   const hora = new Date().getHours(), saludo = hora < 14 ? 'Buenos días' : hora < 21 ? 'Buenas tardes' : 'Buenas noches'
+  if (P.comercial) {
+    $('#main').innerHTML = `<div class="com-inicio"><p class="com-kicker">Tierra Nuestra · Mi día</p><h1>${saludo}, ${h(Nube.perfil.nombre.split(' ')[0])}</h1><p class="mut">¿Qué necesita hacer?</p>
+      <div class="com-accesos">${['horarios', 'comerciales'].filter((id) => P.app(MOD[id])).map((id) => `<a class="mod com-acceso" data-mod="${id}" href="${enlace(MOD[id])}"><div class="e">${SVG(id)}</div><b>${id === 'horarios' ? 'Horarios' : 'Comerciales'}</b><span>${id === 'horarios' ? 'Ver mis turnos y fichar' : 'Enviar catálogo · Clientes · Pedidos'}</span><strong>Entrar →</strong></a>`).join('')}</div>
+      <div class="com-aviso">Para enviar a clientes, use los botones <b>«Sin precios»</b> de Comerciales.</div></div>`
+    return
+  }
   $('#main').innerHTML = `
     <h1>${saludo}${P.personal ? ', ' + h(Nube.perfil.nombre.split(' ')[0]) : ''}</h1>
     <div class="mut">${P.personal ? 'Puesto: <b>' + h(ROLES[Nube.perfil.rol] || Nube.perfil.rol) + '</b> · <a href="#/cuenta">Mi cuenta</a>' : 'Todas las aplicaciones de Tierra Nuestra en un solo sitio, con los datos de Sage 50.'}</div>
@@ -308,6 +324,38 @@ function pintarEstado() {
     <a class="stat" href="#/m/whatsapp"><b>${EST.wa.abiertos}</b><span>Pedidos WhatsApp por revisar (${EST.wa.confirmados} confirmados)</span></a>
   </div>`
 }
+
+const CATALOGOS = [
+  { id: 'bodegas', nombre: 'Por bodegas', detalle: 'Para presentar las casas y sus vinos a restaurantes.', archivo: 'hosteleria-bodegas-sin-precios.pdf', paginas: 65 },
+  { id: 'tipos', nombre: 'Por tipos y denominaciones', detalle: 'Para buscar vinos por tipo y denominación de origen.', archivo: 'hosteleria-tipos-do-sin-precios.pdf', paginas: 33 },
+]
+function vistaComerciales() {
+  cerrarModulo(); V.sage = false; V.vista = 'comerciales'; dock()
+  $('#titulo').textContent = 'Comerciales'
+  document.title = 'Comerciales · TN Central'
+  if (!P.personal) {
+    $('#main').innerHTML = '<h1>Comerciales</h1><div class="card">Entre con su correo y contraseña en <a href="#/sage">Mi cuenta</a> para ver sus catálogos y clientes.</div>'
+    return
+  }
+  $('#main').innerHTML = `<p class="com-kicker">Material para sus clientes</p><h1>Enviar catálogo</h1><p class="mut">Elija el catálogo. Los dos son <b>sin precios</b>.</p>
+    <div class="com-catalogos">${CATALOGOS.map((c) => {
+      const url = new URL('catalogos/' + c.archivo, location.href).href
+      const mensaje = `Le comparto el catálogo de hostelería de Tierra Nuestra, ${c.nombre.toLowerCase()}, sin precios.\n${url}`
+      return `<section class="card com-catalogo" aria-labelledby="cat-${c.id}"><div class="com-portada">${SVG(c.id === 'bodegas' ? 'vino' : 'guia')}<span>HOSTELERÍA</span><b>${h(c.nombre)}</b></div><div class="com-contenido"><span class="com-sin-precios">Sin precios</span><h2 id="cat-${c.id}">${h(c.nombre)}</h2><p>${h(c.detalle)}</p><p class="mut">${c.paginas} páginas · Borrador existente, pendiente de revisión editorial</p><div class="com-acciones"><a class="btn" href="https://wa.me/?text=${encodeURIComponent(mensaje)}" target="_blank" rel="noopener noreferrer">Enviar por WhatsApp</a><button class="btn sec" data-compartir="${c.id}">Compartir enlace</button><a class="btn sec" href="${h(url)}" target="_blank" rel="noopener">Ver PDF</a><a class="btn sec" href="${h(url)}" download="${c.archivo}">Descargar PDF</a></div></div></section>`
+    }).join('')}</div>
+    <div class="com-aviso"><b>Los precios, aparte.</b> Estos botones solo envían el PDF sin precios, nunca sus tarifas ni datos de clientes. Las versiones con precios por cliente aún no están habilitadas aquí. Un PDF enviado se puede reenviar; no se puede retirar después.</div>
+    <h2>Mi trabajo · Uso interno</h2><div class="grid">${['clientes', 'ventas', 'precios'].filter((id) => P.app(MOD[id])).map((id) => `<a class="mod" href="${enlace(MOD[id])}"><div class="e">${SVG(id)}</div><b>${h(MOD[id].n)}</b><span>${h(MOD[id].d)}</span></a>`).join('')}</div>
+    <details class="com-anterior"><summary>Herramienta anterior de clientes y pedidos</summary><p>Puede seguir preparando pedidos como hasta ahora. Esta herramienta muestra tarifas y sus PDF pueden llevar precios. Para enviar un catálogo sin precios, use los botones de arriba.</p><a class="btn sec" href="#/m/comerciales/pedidos">Abrir clientes y pedidos</a></details><p class="mut">Las consultas internas pueden mostrar importes. No las comparta como catálogo.</p>`
+  $$('[data-compartir]').forEach((b) => (b.onclick = async () => {
+    const c = CATALOGOS.find((x) => x.id === b.dataset.compartir)
+    const url = new URL('catalogos/' + c.archivo, location.href).href
+    try {
+      if (navigator.share) await navigator.share({ title: 'Tierra Nuestra · ' + c.nombre + ' · Sin precios', text: 'Catálogo de hostelería sin precios', url })
+      else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); toast('Enlace sin precios copiado. Ya puede pegarlo en su mensaje.') }
+      else toast('Use «Enviar por WhatsApp» o «Descargar PDF».', 5000)
+    } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir. Use «Enviar por WhatsApp» o «Descargar PDF».', 5000) }
+  }))
+}
 async function entrar(e) {
   e.preventDefault()
   const pw = $('#pw').value, em = ($('#em')?.value || '').trim(); if (!pw) return toast('Escriba la contraseña')
@@ -345,6 +393,7 @@ function vistaSage() {
 
 // ---------- usuario, equipo y permisos ----------
 function pintarUsuario() {
+  $('#nube').hidden = P.comercial
   const b = $('#b-ia'); if (b) b.hidden = !(P.personal && P.ve('ia'))
   if (!b || b.hidden) $('#ia').hidden = true
 }
@@ -636,6 +685,7 @@ function ruta() {
 window.addEventListener('hashchange', ruta)
 $('#nube').onclick = () => (location.hash = '#/sage')
 $('#b-ia').onclick = abrirIA
+if (!Nube.token && Nube.perfil) Nube.salir()
 ruta()
 pintarNube()
 pintarUsuario()

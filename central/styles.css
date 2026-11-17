@@ -28,6 +28,23 @@ main{max-width:1100px;margin:0 auto;padding:calc(var(--top) + env(safe-area-inse
 h1{font-size:24px;margin:2px 0 4px}
 h2{font-size:17px;margin:22px 0 10px;font-family:FiraC;letter-spacing:.1em;text-transform:uppercase;color:var(--vino)}
 .mut{color:var(--gris);font-size:14px}
+.com-inicio{max-width:820px;margin:18px auto}
+.com-kicker{font-family:FiraC;letter-spacing:.13em;text-transform:uppercase;color:var(--vino);font-size:14px;margin:0 0 10px}
+.com-accesos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:24px}
+.com-acceso{min-height:230px;padding:24px;gap:12px;border:2px solid var(--borde)}
+.com-acceso .e{width:64px;height:64px}.com-acceso .e svg{width:36px;height:36px}
+.com-acceso b{font-size:26px}.com-acceso span{font-size:16px}.com-acceso strong{color:var(--vino);margin-top:auto}
+.com-aviso{border-left:4px solid var(--lila);padding:14px 16px;background:#f3eaf0;border-radius:0 10px 10px 0;line-height:1.5;margin:24px 0;font-size:15px}
+.com-catalogos{display:grid;gap:18px;margin-top:20px}
+.com-catalogo{display:flex;padding:0;overflow:hidden}
+.com-portada{background:var(--vino);color:white;width:180px;flex:none;padding:24px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.com-portada svg{width:50px;height:60px}.com-portada span{font:13px FiraC;letter-spacing:.12em}.com-portada b{font-size:20px}
+.com-contenido{padding:20px;min-width:0}.com-contenido h2{margin:10px 0;font-size:22px;letter-spacing:0;text-transform:none}
+.com-sin-precios{color:#176b3b;background:#e6f4ec;font-weight:600;font-size:14px;padding:5px 10px;border-radius:99px;display:inline-block}
+.com-acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.com-acciones .btn{min-height:48px;justify-content:center}
+.com-anterior{margin-top:18px;padding:14px;border:1px solid var(--borde);border-radius:10px}.com-anterior summary{cursor:pointer;color:var(--vino);font-weight:600}
+.com-acceso:focus-visible,.com-acciones .btn:focus-visible{outline:3px solid var(--lila);outline-offset:3px}
+@media(max-width:640px){.com-accesos{grid-template-columns:1fr;gap:14px;margin-top:18px}.com-acceso{min-height:168px;padding:20px}.com-catalogo{flex-direction:column}.com-portada{width:100%;flex-direction:row;padding:16px;justify-content:flex-start;text-align:left}.com-portada svg{width:32px;height:42px;flex:none}.com-portada span{display:none}.com-acciones{flex-direction:column}.com-acciones .btn{width:100%}.com-contenido{padding:16px}}
 .card{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px}
 .busca{position:relative;margin:14px 0 6px}
 .busca input{width:100%;border:2px solid var(--borde);border-radius:14px;padding:14px 16px 14px 44px;font-size:17px;background:#fff}
