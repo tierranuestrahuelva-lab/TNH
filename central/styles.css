@@ -145,3 +145,28 @@ ol li,ul li{margin:4px 0}
 .lector{position:fixed;inset:0;background:#000b;z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
 .lector-c{background:#fff;border-radius:16px;padding:14px;width:min(460px,100%);display:flex;flex-direction:column;gap:10px}
 .lector-c video{width:100%;border-radius:12px;background:#000;aspect-ratio:4/3;object-fit:cover}
+/* Modo fácil (inicio sencillo con voz) */
+.facil{text-align:left}.facil h1{color:#830040;margin-bottom:6px}
+.facil-intro{font-size:22px;margin:0 0 18px}
+.facil-mic{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:200px;height:200px;margin:8px auto 6px;border-radius:50%;border:0;background:#830040;color:#fff;font:600 22px var(--f,inherit);cursor:pointer;box-shadow:0 0 0 14px #f4e9ef}
+.facil-mic svg{width:66px;height:66px}.facil-mic:focus-visible{outline:4px solid #B771A0;outline-offset:18px}
+.facil-mic.escuchando{background:#B3261E;box-shadow:0 0 0 14px #f8d7d4;animation:facil-latido 1.2s infinite}
+@keyframes facil-latido{50%{box-shadow:0 0 0 24px #f8d7d4}}
+.facil-estado{text-align:center;min-height:1.4em;font-size:18px;margin:12px 0}
+.facil-sub{font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6f6268;margin:26px 0 10px}
+.facil-sug{display:flex;flex-direction:column;gap:12px}
+.facil-q{display:block;width:100%;text-align:left;background:#fff;border:2px solid #B771A0;border-radius:14px;padding:16px 18px;font:inherit;font-size:21px;color:#271820;cursor:pointer}
+.facil-q:hover,.facil-q:focus-visible{border-color:#830040;background:#fff5f9}
+.facil-resumen{margin-top:12px;border-color:#830040;color:#830040;font-weight:600}
+.facil-respuesta{background:#fff;border:1px solid #e3d6dc;border-radius:16px;padding:20px;margin-top:10px;scroll-margin-top:80px}
+.facil-p{margin:0 0 8px;color:#6f6268;font-size:17px}
+.facil-a{font-size:24px;line-height:1.45}.facil-a b{color:#830040}.facil-a.esperando{color:#6f6268;font-style:italic}.facil-a.error{font-size:20px;color:#8a1c14}
+.facil[data-letra="1"] .facil-a{font-size:30px}.facil[data-letra="2"] .facil-a{font-size:36px}
+.facil-acciones{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.facil-b{display:flex;align-items:center;justify-content:center;text-align:center;border:2px solid #830040;background:#fff;color:#830040;border-radius:14px;padding:14px 8px;font:inherit;font-size:18px;font-weight:600;cursor:pointer;text-decoration:none;min-height:60px}
+.facil-b:hover{background:#830040;color:#fff}
+.facil-escribir{margin-top:26px}.facil-escribir label{display:block;font-size:18px;margin-bottom:6px}.facil-escribir .row{display:flex;gap:10px}.facil-escribir input{flex:1;font:inherit;font-size:19px;padding:12px;border:1.5px solid #d8c9d0;border-radius:12px;min-width:0}
+.facil-voz{display:flex;gap:10px;align-items:center;font-size:18px;margin:18px 0 6px}.facil-voz input{width:24px;height:24px}
+.facil-truco{font-size:16px;color:#6f6268;background:#f4e9ef;border-radius:12px;padding:12px 14px}
+a.personal-tarjeta{text-decoration:none}
+@media(max-width:520px){.facil-mic{width:180px;height:180px}.facil-a{font-size:22px}.facil[data-letra="1"] .facil-a{font-size:27px}.facil[data-letra="2"] .facil-a{font-size:32px}}

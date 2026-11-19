@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.5.0'
+const VERSION = '1.6.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -99,7 +99,7 @@ const Nube = {
     this.perfil = p && p.activo ? { ...p, email: this.token.user.email, perms } : { sinPuesto: true, email: this.token.user.email, perms: [] }
     this.preferencias = null
     if (p?.activo) {
-      try { this.preferencias = (await this.api('tn_preferencias?select=inicio_sencillo,notas_ia&user_id=eq.' + uid))?.[0] || null } catch (e) { /* Compatibilidad hasta instalar la migración 009. */ }
+      try { this.preferencias = (await this.api('tn_preferencias?select=inicio_sencillo,notas_ia,frecuentes&user_id=eq.' + uid))?.[0] || null } catch (e) { /* Compatibilidad hasta instalar la migración 009. */ }
     }
     return this.perfil
   },
@@ -156,6 +156,7 @@ const P = {
   app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
 }
 const Personal = window.TNPersonal({ Nube, P, $, h, SVG, toast, pintarEstado, abrirIA, preguntar,
+  apps: () => ['comerciales', 'horarios', 'tpv', 'guia'].filter((id) => MOD[id] && P.app(MOD[id])).map((id) => ({ id, n: MOD[id].n, d: MOD[id].d, href: '#/m/' + id })),
   preparar: (vista) => { cerrarModulo(); V.sage = false; V.vista = vista; dock() },
 })
 

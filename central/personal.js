@@ -1,43 +1,149 @@
 /* Espacio personal: preferencias voluntarias y compras que la persona revisa. */
 'use strict'
-window.TNPersonal = function ({ Nube, P, $, h, SVG, toast, preparar, pintarEstado, abrirIA, preguntar }) {
+window.TNPersonal = function ({ Nube, P, $, h, SVG, toast, preparar, pintarEstado, abrirIA, preguntar, apps = () => [] }) {
   const uid = () => Nube.token?.user?.id
   const puedeComprar = () => P.gerente || Nube.perfil?.perms?.some((p) => p.modulo === 'compras' && p.editar)
   const api = (...a) => Nube.api(...a)
-  const hablar = (q = '') => { if ($('#ia').hidden) abrirIA(); if (q) preguntar(q) }
   const avisoError = (e) => toast('No se pudo guardar o cargar: ' + e.message, 6000)
   let generacion = 0
+  const MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'
+  const DEF = {
+    gerente: ['¿Qué hay que pagar esta semana?', '¿Quién nos debe dinero?', '¿Qué pedidos faltan por servir?'],
+    oficina: ['¿Qué hay que pagar esta semana?', '¿Quién nos debe dinero?', '¿Qué pedidos faltan por servir?'],
+    comercial: ['¿Qué pedidos de mis clientes faltan por servir?', '¿Qué me deben mis clientes?', 'Recomiéndame un vino para un restaurante de marisco'],
+    dependienta: ['Un vino para regalar de unos 20 euros', '¿Qué vino va bien con pescado por menos de 15 euros?', '¿Qué falta por reponer en la tienda?'],
+  }
+  const RESUMEN = {
+    gerente: 'Dame el resumen del día: pagos que vencen esta semana, los cobros vencidos más importantes, pedidos de venta pendientes y cómo va el reparto hoy.',
+    oficina: 'Dame el resumen del día: pagos que vencen esta semana, los cobros vencidos más importantes y pedidos de venta pendientes.',
+    comercial: 'Dame el resumen del día de mis clientes: pedidos pendientes de servir y cobros vencidos.',
+    dependienta: 'Dame el resumen del día de la tienda: lo que falta por reponer y cómo va el reparto hoy.',
+  }
+  const RECUERDA = /^\s*(recuerda|recuérdame|recuerdame|apunta|acuérdate de|acuerdate de)\s+(que\s+)?/i
+  const clave = (q) => q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¿?¡!.,;:]/g, '').replace(/\s+/g, ' ').trim()
+  const plano = (t) => String(t || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/^\s*[-•]\s*/gm, '').replace(/#+\s*/g, '')
+  const LETRA = 'tn-facil-letra', VOZ = 'tn-facil-voz'
+  let charla = [], ocupada = false, ultima = null
+  const frecuentes = () => (Array.isArray(Nube.preferencias?.frecuentes) ? Nube.preferencias.frecuentes : [])
+  async function guardarFrecuentes(lista) {
+    lista = lista.sort((a, b) => (b.f - a.f) || (b.n - a.n) || String(b.u).localeCompare(String(a.u))).slice(0, 30)
+    if (Nube.preferencias) Nube.preferencias.frecuentes = lista
+    try { await api('tn_preferencias?user_id=eq.' + uid(), 'PATCH', { frecuentes: lista, actualizado: new Date().toISOString() }) } catch (e) { /* aprender es opcional */ }
+  }
+  function aprender(q, fijar) {
+    const k = clave(q); if (!k || RECUERDA.test(q)) return
+    const lista = frecuentes().map((x) => ({ ...x })), x = lista.find((y) => clave(y.q) === k)
+    if (x) { x.n = (x.n || 0) + (fijar === undefined ? 1 : 0); x.u = new Date().toISOString(); if (fijar !== undefined) x.f = fijar } else lista.push({ q: q.trim().slice(0, 200), n: fijar === undefined ? 1 : 0, f: !!fijar, u: new Date().toISOString() })
+    return guardarFrecuentes(lista)
+  }
+  function sugerencias() {
+    const vistas = new Set(), out = []
+    for (const x of [...frecuentes()].sort((a, b) => (b.f - a.f) || (b.n - a.n))) if (x.f || x.n >= 2) { if (!vistas.has(clave(x.q))) { vistas.add(clave(x.q)); out.push(x.q) } }
+    for (const q of DEF[Nube.perfil?.rol] || DEF.dependienta) if (!vistas.has(clave(q))) { vistas.add(clave(q)); out.push(q) }
+    return out.slice(0, 5)
+  }
+  function leer(t) {
+    if (!('speechSynthesis' in window)) return
+    speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(plano(t)); u.lang = 'es-ES'; u.rate = 0.95
+    const v = speechSynthesis.getVoices().find((x) => /^es(-|_)ES/i.test(x.lang)) || speechSynthesis.getVoices().find((x) => /^es/i.test(x.lang))
+    if (v) u.voice = v
+    speechSynthesis.speak(u)
+  }
+  function pintarSugerencias() {
+    const caja = $('#facil-sug'); if (!caja) return
+    caja.innerHTML = sugerencias().map((q, i) => `<button type="button" class="facil-q" data-facil-q="${i}">${h(q)}</button>`).join('')
+    const lista = sugerencias()
+    caja.querySelectorAll('[data-facil-q]').forEach((b) => { b.onclick = () => consultar(lista[+b.dataset.facilQ]) })
+  }
+  function pintarRespuesta(q, texto, error) {
+    const caja = $('#facil-respuesta'); caja.hidden = false
+    const fijada = frecuentes().some((x) => x.f && clave(x.q) === clave(q))
+    caja.innerHTML = `<p class="facil-p">Has preguntado: «${h(q)}»</p><div class="facil-a${error ? ' error' : ''}">${h(texto).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>
+      ${error ? '' : `<div class="facil-acciones"><button type="button" class="facil-b" id="facil-repetir">Repetir en voz alta</button><button type="button" class="facil-b" id="facil-parar">Callar</button><button type="button" class="facil-b" id="facil-letra">Más letra</button>${RECUERDA.test(q) ? '' : `<button type="button" class="facil-b" id="facil-fijar">${fijada ? 'Quitar de mis preguntas' : 'Guardar en mis preguntas'}</button>`}<a class="facil-b" id="facil-wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(plano(texto))}">Mandar por WhatsApp</a></div>`}`
+    caja.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (error) return
+    $('#facil-repetir').onclick = () => leer(texto)
+    $('#facil-parar').onclick = () => window.speechSynthesis?.cancel()
+    $('#facil-letra').onclick = () => { const n = ((+localStorage.getItem(LETRA) || 0) + 1) % 3; localStorage.setItem(LETRA, n); $('.personal').dataset.letra = n }
+    if ($('#facil-fijar')) $('#facil-fijar').onclick = async () => { await aprender(q, !fijada); pintarSugerencias(); pintarRespuesta(q, texto) }
+  }
+  async function recordar(q) {
+    const nota = q.replace(RECUERDA, '').trim()
+    const antes = Nube.preferencias?.notas_ia || '', nuevas = (antes ? antes + '\n' : '') + '- ' + nota
+    if (!nota) return pintarRespuesta(q, 'Dime qué quieres que recuerde. Por ejemplo: «Recuerda que cuando digo Sevilla me refiero a Avanza Vinos».', true)
+    if (nuevas.length > 1000) return pintarRespuesta(q, 'Ya tengo muchas cosas apuntadas. Borra alguna en «Lo que recuerda mi asistente» y vuelve a decírmelo.', true)
+    try {
+      await api('tn_preferencias?user_id=eq.' + uid(), 'PATCH', { notas_ia: nuevas, actualizado: new Date().toISOString() })
+      if (Nube.preferencias) Nube.preferencias.notas_ia = nuevas
+      const t = 'Apuntado. Lo tendré en cuenta a partir de ahora: ' + nota
+      pintarRespuesta(q, t); if (localStorage.getItem(VOZ) !== '0') leer(t)
+    } catch (e) { pintarRespuesta(q, 'No he podido apuntarlo. Comprueba la conexión e inténtalo otra vez.', true) }
+  }
+  async function consultar(q) {
+    q = String(q || '').trim(); if (!q) return
+    if (ocupada) return toast('Espera a que termine la respuesta anterior')
+    if (!P.ve('ia')) return toast('Tu puesto no tiene acceso al asistente')
+    window.speechSynthesis?.cancel()
+    if ($('#personal-q')) $('#personal-q').value = ''
+    if (RECUERDA.test(q)) return recordar(q)
+    ocupada = true; const usuario = uid()
+    const caja = $('#facil-respuesta'); caja.hidden = false
+    caja.innerHTML = `<p class="facil-p">Has preguntado: «${h(q)}»</p><div class="facil-a esperando">Un momento, lo estoy mirando…</div>`
+    caja.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    try {
+      const r = await Nube.fn('tn-copiloto', { pregunta: q, historial: charla, modo: 'facil' })
+      if (usuario !== uid()) return
+      charla.push({ role: 'user', content: q }, { role: 'assistant', content: r.respuesta }); charla = charla.slice(-8)
+      ultima = q; pintarRespuesta(q, r.respuesta)
+      if (localStorage.getItem(VOZ) !== '0') leer(r.respuesta)
+      aprender(q)?.then(pintarSugerencias)
+    } catch (e) { if (usuario === uid()) pintarRespuesta(q, 'No he podido responder: ' + e.message + '. Prueba otra vez dentro de un momento.', true) }
+    finally { ocupada = false }
+  }
+  function escuchar() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    const boton = $('#facil-mic'), estado = $('#personal-micro-estado')
+    if (!SR) { estado.textContent = 'En este móvil no puedo oírte. Escribe la pregunta aquí abajo.'; $('#personal-q').focus(); return }
+    window.speechSynthesis?.cancel()
+    const r = new SR(); r.lang = 'es-ES'; r.interimResults = false; r.maxAlternatives = 1
+    boton.classList.add('escuchando'); boton.querySelector('span').textContent = 'Te escucho…'; estado.textContent = 'Habla ahora. Cuando termines, espera un segundo.'
+    const fin = () => { boton.classList.remove('escuchando'); boton.querySelector('span').textContent = 'Pulsa y habla' }
+    r.onresult = (e) => { fin(); estado.textContent = ''; consultar(e.results[0][0].transcript) }
+    r.onerror = (e) => { fin(); estado.textContent = e.error === 'not-allowed' ? 'Hay que dar permiso al micrófono. Pulsa otra vez y elige «Permitir».' : 'No te he oído bien. Pulsa otra vez.' }
+    r.onend = fin
+    try { r.start() } catch (e) { fin() }
+  }
   function inicio() {
-    const nombre = /maribel@/i.test(Nube.perfil.email) ? 'Maribel' : Nube.perfil.nombre.split(' ')[0]
-    const accesoIA = P.ve('ia')
-    $('#main').innerHTML = `<section class="personal"><p class="mut">TU ESPACIO PERSONAL</p><h1>Hola, ${h(nombre)}</h1><p>¿Qué necesitas consultar?</p>
-      ${accesoIA ? '<form id="personal-pregunta" class="card"><label for="personal-q">Pregunta con tus palabras</label><input id="personal-q" placeholder="Por ejemplo: ¿qué debe este cliente?" required maxlength="2000"><div class="row"><button class="btn">Preguntar</button><button type="button" class="btn sec" id="personal-micro">Hablar</button></div><span id="personal-micro-estado" role="status"></span></form>' : '<p>Tu puesto no tiene acceso al asistente. Puedes consultar las opciones disponibles abajo.</p>'}
-      <div class="personal-grid">${[
-        ['ia', 'Preguntar a mi asistente', 'Precios, clientes y dudas del día', P.ve('ia')],
-        ['precios', 'Precios y stock', 'Busca un vino y comprueba sus tarifas', P.ve('almacen')],
-        ['cartera', 'Deudas de clientes', 'Consulta los cobros pendientes', P.ve('cartera')],
-        ['compras', 'Mis compras', 'Prepara un borrador y revisa lo que falta por llegar', P.ve('compras')],
-      ].filter((x) => x[3]).map(([id, t, d]) => `<button class="personal-tarjeta" data-personal="${id}">${SVG(id === 'ia' ? 'ia' : id)}<b>${t}</b><span>${d}</span></button>`).join('')}</div>
+    const nombre = /maribel@/i.test(Nube.perfil.email) ? 'Maribel' : /^tienda/i.test(Nube.perfil.nombre) ? 'equipo' : Nube.perfil.nombre.split(' ')[0]
+    const accesoIA = P.ve('ia'), hora = new Date().getHours(), saludo = hora < 14 ? 'Buenos días' : hora < 21 ? 'Buenas tardes' : 'Buenas noches'
+    const resumen = RESUMEN[Nube.perfil.rol]
+    const opciones = [
+      ['precios', 'Precios y stock', 'Busca un vino y comprueba sus tarifas', P.ve('almacen'), '#/v/precios'],
+      ['cartera', 'Deudas de clientes', 'Consulta los cobros pendientes', P.ve('cartera'), '#/v/cartera'],
+      ['compras', 'Mis compras', 'Prepara un borrador y revisa lo que falta por llegar', P.ve('compras'), '#/miscompras'],
+      ...apps().map((a) => [a.id, a.n, a.d, true, a.href]),
+    ].filter((x) => x[3])
+    $('#main').innerHTML = `<section class="personal facil" data-letra="${+localStorage.getItem(LETRA) || 0}"><h1>${saludo}, ${h(nombre)}</h1>
+      ${accesoIA ? `<p class="facil-intro">Pulsa el botón y pregúntame lo que necesites.</p>
+      <button type="button" class="facil-mic" id="facil-mic">${MIC}<span>Pulsa y habla</span></button>
+      <p id="personal-micro-estado" class="facil-estado" role="status"></p>
+      <div id="facil-respuesta" class="facil-respuesta" aria-live="polite" hidden></div>
+      <p class="facil-sub">Lo que sueles preguntar</p><div id="facil-sug" class="facil-sug"></div>
+      ${resumen ? '<button type="button" class="facil-q facil-resumen" id="facil-resumen">El resumen del día</button>' : ''}
+      <form id="personal-pregunta" class="facil-escribir"><label for="personal-q">O escribe tu pregunta</label><div class="row"><input id="personal-q" placeholder="Por ejemplo: ¿qué debe Casa Luciano?" required maxlength="2000" enterkeyhint="send"><button class="btn">Preguntar</button></div></form>
+      <label class="facil-voz"><input type="checkbox" id="facil-voz" ${localStorage.getItem(VOZ) !== '0' ? 'checked' : ''}> Leer las respuestas en voz alta</label>
+      <p class="facil-truco">Truco: di «Recuerda que…» y lo apunto para la próxima vez. Por ejemplo: «Recuerda que cuando digo Sevilla me refiero a Avanza Vinos».</p>`
+      : '<p>Tu puesto no tiene acceso al asistente. Puedes consultar las opciones disponibles abajo.</p>'}
+      ${opciones.length ? `<p class="facil-sub">Más opciones</p><div class="personal-grid">${opciones.map(([id, t, d, , href]) => `<a class="personal-tarjeta" href="${href}">${SVG(id)}<b>${h(t)}</b><span>${h(d)}</span></a>`).join('')}</div>` : ''}
       <div id="estado"></div><p><a href="#/personal">Lo que recuerda mi asistente</a> · <a href="#/cuenta">Mi cuenta y contraseña</a> · <a href="#/completo">Todas las aplicaciones</a></p></section>`
     pintarEstado()
-    document.querySelectorAll('[data-personal]').forEach((b) => { b.onclick = () => {
-      const id = b.dataset.personal
-      if (id === 'ia') hablar()
-      else location.hash = id === 'compras' ? '#/miscompras' : '#/v/' + id
-    } })
     if (!accesoIA) return
-    $('#personal-pregunta').onsubmit = (e) => { e.preventDefault(); if (!P.ve('ia')) return toast('Tu puesto no tiene acceso al asistente'); hablar($('#personal-q').value) }
-    $('#personal-micro').onclick = () => {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SR) return toast('Puedes escribir la pregunta. La voz está disponible en Chrome para Android.')
-      const r = new SR(); r.lang = 'es-ES'; r.interimResults = false
-      const estado = $('#personal-micro-estado'), campo = $('#personal-q')
-      estado.textContent = 'Escuchando…'
-      r.onresult = (e) => { campo.value = e.results[0][0].transcript; estado.textContent = 'Revisa la pregunta y pulsa Preguntar.' }
-      r.onerror = () => { estado.textContent = 'No se pudo usar el micrófono. Puedes escribir.' }
-      r.onend = () => { if (estado.textContent === 'Escuchando…') estado.textContent = '' }
-      try { r.start() } catch (e) { estado.textContent = 'No se pudo abrir el micrófono.' }
-    }
+    pintarSugerencias()
+    $('#facil-mic').onclick = escuchar
+    if (resumen) $('#facil-resumen').onclick = () => consultar(resumen)
+    $('#facil-voz').onchange = (e) => { localStorage.setItem(VOZ, e.target.checked ? '1' : '0'); if (!e.target.checked) window.speechSynthesis?.cancel() }
+    $('#personal-pregunta').onsubmit = (e) => { e.preventDefault(); consultar($('#personal-q').value) }
   }
   async function preferencias() {
     preparar('personal')
