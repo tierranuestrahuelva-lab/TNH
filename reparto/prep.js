@@ -145,12 +145,13 @@ function vPreparar(m) {
   m.innerHTML = `<div class="row" style="margin-bottom:12px"><h1 class="grow" style="margin:0">Pedidos para preparar</h1>${R().selectorFecha()}</div>
   <p><button class="btn sec" id="pk-conteo">Recuento físico frente a Sage</button> <button class="btn sec" id="pk-devoluciones">Seguimiento y devoluciones</button></p>
   ${lista.length ? '' : '<div class="card mut">No hay pedidos con artículos para este día. La oficina los pasa desde la pestaña Almacén (WhatsApp o Sage).</div>'}
-  ${lista.map((a) => { const L = lineas(a), hechas = L.filter((l) => l.hecha).length; return `<div class="card stop" data-pk="${a.id}"><div class="num" style="background:${PCOL[est(a)]}">${hechas}/${L.length}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)}${diaTxt(a)} · ${L.length} artículos · 🚚 ${h(a.repartidor || 'sin asignar')}</div>${R().fraTxt(a)}${a.prep?.quien ? `<div class="mut">👤 ${h(a.prep.quien)}</div>` : ''}${revTxt(a)}${est(a) === 'preparado' && !a.prep?.revisado ? `<button class="btn sm" data-rev="${a.id}" style="margin-top:6px">👀 Revisar pedido</button>` : ''}<div class="bar" style="margin-top:6px"><i style="width:${L.length ? (100 * hechas) / L.length : 0}%"></i></div></div><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span></div>` }).join('')}
+  ${lista.map((a) => { const L = lineas(a), hechas = L.filter((l) => l.hecha).length; return `<div class="card stop" data-pk="${a.id}"><div class="num" style="background:${PCOL[est(a)]}">${hechas}/${L.length}</div><div class="grow"><b>${h(a.cliente.nombre)}</b><div class="mut">Alb. ${h(a.numero)}${diaTxt(a)} · ${L.length} artículos · 🚚 ${h(a.repartidor || 'sin asignar')}</div>${R().fraTxt(a)}${a.prep?.quien ? `<div class="mut">👤 ${h(a.prep.quien)}</div>` : ''}${revTxt(a)}${est(a) === 'preparado' && !a.prep?.revisado ? `<button class="btn sm" data-rev="${a.id}" style="margin-top:6px">👀 Revisar pedido</button>` : ''}${est(a) === 'preparado' ? `<button class="btn sm ok" data-tienda="${a.id}" style="margin-top:6px">🛍 Entregar sin ruta (tienda / Huelva)</button>` : ''}${a.prep?.sinRuta ? `<div class="mut" style="color:var(--ok)">🛍 Entregado sin ruta · ${h(a.prep.sinRuta)}</div>` : ''}<div class="bar" style="margin-top:6px"><i style="width:${L.length ? (100 * hechas) / L.length : 0}%"></i></div></div><span class="pill" style="background:${PCOL[est(a)]}">${PREP[est(a)]}</span></div>` }).join('')}
   ${sin ? `<div class="mut">${sin} albaranes de este día no traen artículos (llegarán con la conexión a Sage).</div>` : ''}`
   R().enlazarFecha()
   $('#pk-conteo').onclick = () => window.TNTrazabilidad.contar()
   $('#pk-devoluciones').onclick = () => window.TNTrazabilidad.pedidos(paraPreparar())
   $$('[data-rev]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); revisar(R().S.albaranes.find((x) => x.id === b.dataset.rev)) }))
+  $$('[data-tienda]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); sinRuta(R().S.albaranes.find((x) => x.id === b.dataset.tienda)) }))
   if (R().V.q.trim() && lista.length === 1 && !lista[0].prep?.revisado && est(lista[0]) !== 'cargado') $('#bq').onkeydown = (e) => { if (e.key === 'Enter') $('[data-pk]').click() }
   $$('[data-pk]').forEach((b) => (b.onclick = () => {
     const a = R().S.albaranes.find((x) => x.id === b.dataset.pk)
@@ -159,6 +160,24 @@ function vPreparar(m) {
     a.prep = Object.assign({ l: {} }, a.prep, { estado: 'preparando', quien: R().U.nombre, inicio: a.prep?.inicio || new Date().toISOString() }); R().tocar(a)
     PK = { id: a.id }; R().render(); anunciar(a)
   }))
+}
+// Huelva y clientes que recogen en la tienda: se prepara, se revisa, se cobra en caja y se entrega sin asignar ruta.
+function sinRuta(a) {
+  if (!a) return
+  if (!a.prep?.revisado && !confirm('Este pedido no lo ha revisado un compañero. ¿Entregarlo igualmente?')) return
+  let forma = 'Cobrado en caja'
+  R().modal(`<h2>Entregar sin ruta</h2><p><b>${h(a.cliente.nombre)}</b><br><span class="mut">Alb. ${h(a.numero)} · ${a.prep?.bultos || 0} bultos</span></p>${R().fraTxt(a)}
+  <label>Cobro</label><div class="choice" id="tr-cob">${['Cobrado en caja', 'Ya pagado / a crédito'].map((c) => `<button data-c="${c}" class="${c === forma ? 'on' : ''}">${c}</button>`).join('')}</div>
+  <label>¿Quién lo recoge o lo lleva? (opcional)</label><input id="tr-rec" placeholder="Nombre">
+  <button class="btn ok big" id="tr-ok" style="margin-top:10px">✔ Entregado</button><button class="btn sec" id="tr-x" style="margin-top:8px;width:100%">Cancelar</button>`)
+  $$('#tr-cob button').forEach((b) => (b.onclick = () => { forma = b.dataset.c; $$('#tr-cob button').forEach((x) => x.classList.toggle('on', x === b)) }))
+  $('#tr-x').onclick = () => R().cerrar()
+  $('#tr-ok').onclick = () => {
+    const t = new Date().toISOString()
+    Object.assign(a.prep, { estado: 'cargado', cargadoAt: t, sinRuta: R().U.nombre })
+    a.entrega = { hora: t, receptor: $('#tr-rec').value.trim(), firma: null, foto: null, gps: null, nota: 'Entregado sin ruta (tienda / Huelva)', cobro: { forma, importe: 0 } }
+    delete a.incidencia; a.estado = 'entregado'; R().tocar(a); R().cerrar(); R().render(); R().toast('Entregado ✔')
+  }
 }
 function revisar(a) {
   if (!a) return
