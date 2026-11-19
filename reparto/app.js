@@ -74,7 +74,7 @@ function fusionar(lista, origen) {
       // Sage manda los datos del documento; lo hecho en la calle se conserva
       Object.assign(v, { cliente: Object.assign({}, v.cliente, n.cliente, v.cliente?.lat ? { lat: v.cliente.lat, lng: v.cliente.lng } : {}), lineas: n.lineas, total: n.total, formaPago: n.formaPago, obs: n.obs, fecha: v.fecha || n.fecha }, 'factura' in n ? { factura: n.factura, fechaFactura: n.fechaFactura, pendiente: n.pendiente } : {})
       act++
-    } else if ((n.upd || 0) > (v.upd || 0)) { Object.assign(v, n); act++ }
+    } else if (origen === 'nube' ? !Nube.pend.has(n.id) && (n.upd || 0) !== (v.upd || 0) : (n.upd || 0) > (v.upd || 0)) { Object.assign(v, n); act++ }
   }
   guardar()
   return { nuevos, act }
@@ -109,7 +109,8 @@ const Nube = {
   pendientes() { return this.pend.size },
   async subir(lista) {
     if (!NUBE) return
-    if (!this.token) return this.marcarPend(lista, true)
+    this.marcarPend(lista, true)
+    if (!this.token) return
     try {
       await this.api('reparto_albaranes', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(lista.map((a) => ({ id: a.id, fecha: a.fecha, data: a, upd: a.upd || Date.now() }))) })
       this.marcarPend(lista, false); this.ok()
@@ -816,6 +817,12 @@ async function waConversacion(tel) {
 window.TNR = { get S() { return S }, get U() { return U }, V, busca, fraTxt, enDia, conPendientes, tocar, guardar, toast, modal, cerrar, render, Nube, hoy, delDia, ruta, fechaES, selectorFecha, enlazarFecha, gpsAhora, ESTADOS }
 // Las sesiones guardadas pueden abrir directamente un módulo cargado después de app.js.
 document.addEventListener('DOMContentLoaded', () => {
+  // Con nube, el móvil solo guarda 30 días: lo antiguo sigue en la nube y el móvil no se llena ni se vuelve lento.
+  if (NUBE) {
+    const lim = new Date(Date.now() - 30 * 864e5).toLocaleDateString('sv-SE'), n = S.albaranes.length
+    S.albaranes = S.albaranes.filter((a) => !a.fecha || a.fecha >= lim || Nube.pend.has(a.id))
+    if (S.albaranes.length < n) guardar()
+  }
   render()
   if (NUBE) Nube.bajar()
 }, { once: true })
