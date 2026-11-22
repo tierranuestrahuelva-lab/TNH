@@ -244,5 +244,19 @@ window.TNPersonal = function ({ Nube, P, $, h, SVG, toast, preparar, pintarEstad
       }
     } catch (e) { if (usuario === uid()) $('#main').innerHTML = '<p>No se pudieron cargar tus compras. Comprueba la conexión y vuelve a intentarlo.</p>' }
   }
-  return { inicio, preferencias, compras, sencillo: () => P.personal && Nube.preferencias?.inicio_sencillo }
+  function ofrecer(seguir) {
+    if (!P.personal || Nube.preferencias || !P.ve('ia') || sessionStorage.getItem('tn-ofrecido-' + uid())) return false
+    const usuario = uid()
+    $('#main').innerHTML = `<div class="card"><h1>¿Quiere activar el asistente?</h1><p>Es una pantalla sencilla con un botón grande para preguntar hablando: dónde está un vino, su precio, el stock, lo que debe un cliente… La IA aprende cómo habla usted para entenderle cada vez mejor.</p><p class="mut">Lo puede cambiar cuando quiera en «Mi asistente».</p><div class="row"><button class="btn" id="ofrecer-si">Sí, activarlo</button><button class="btn sec" id="ofrecer-no">No, gracias</button></div></div>`
+    const elegir = async (si) => {
+      sessionStorage.setItem('tn-ofrecido-' + usuario, '1')
+      const datos = { user_id: usuario, inicio_sencillo: si, actualizado: new Date().toISOString() }
+      try { await api('tn_preferencias?on_conflict=user_id', 'POST', datos); if (usuario === uid()) Nube.preferencias = { ...(Nube.preferencias || {}), ...datos } } catch (e) { avisoError(e) }
+      if (usuario === uid()) seguir()
+    }
+    $('#ofrecer-si').onclick = () => elegir(true)
+    $('#ofrecer-no').onclick = () => elegir(false)
+    return true
+  }
+  return { inicio, preferencias, compras, ofrecer, sencillo: () => P.personal && Nube.preferencias?.inicio_sencillo }
 }

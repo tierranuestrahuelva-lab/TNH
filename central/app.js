@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -303,6 +303,7 @@ function cerrarModulo() {
 
 function vistaInicio() {
   cerrarModulo(); V.sage = false; V.vista = null; dock()
+  if (location.hash !== '#/completo' && Personal.ofrecer(vistaInicio)) return
   if (Personal.sencillo() && location.hash !== '#/completo') return Personal.inicio()
   const hora = new Date().getHours(), saludo = hora < 14 ? 'Buenos días' : hora < 21 ? 'Buenas tardes' : 'Buenas noches'
   if (P.comercial) {
