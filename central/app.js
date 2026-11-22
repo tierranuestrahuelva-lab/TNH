@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.6.1'
+const VERSION = '1.7.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))

@@ -151,15 +151,29 @@ window.TNPersonal = function ({ Nube, P, $, h, SVG, toast, preparar, pintarEstad
     const n = ++generacion, usuario = uid()
     $('#main').innerHTML = '<p>Cargando preferencias…</p>'
     try {
-      const rows = await api('tn_preferencias?user_id=eq.' + usuario + '&select=inicio_sencillo,notas_ia')
+      const rows = await api('tn_preferencias?user_id=eq.' + usuario + '&select=inicio_sencillo,notas_ia,vocabulario')
       if (n !== generacion || usuario !== uid() || location.hash !== '#/personal') return
       const p = rows?.[0] || {}
-      $('#main').innerHTML = `<h1>Mi asistente</h1><p>Solo recuerda lo que escribas y guardes aquí. Puedes cambiarlo o borrarlo cuando quieras. Tus preferencias se usan en tus consultas y no se comparten con otros usuarios.</p><form id="personal-preferencias" class="card"><p><label><input type="checkbox" id="personal-sencillo" ${p.inicio_sencillo ? 'checked' : ''}> Usar el inicio sencillo</label></p><label for="personal-notas">Cómo quieres que te ayude</label><textarea id="personal-notas" rows="5" maxlength="1000" placeholder="Por ejemplo: respuestas cortas, con precios y fechas claros">${h(p.notas_ia || '')}</textarea><p class="mut">No guardes contraseñas. Los precios y las deudas siempre se consultan en Sage.</p><div class="row"><button class="btn">Guardar preferencias</button><button class="btn sec" type="button" id="personal-olvidar">Borrar recuerdos</button></div></form><p><a href="#/">Volver al inicio</a></p>`
+      $('#main').innerHTML = `<h1>Mi asistente</h1><p>Solo recuerda lo que escribas y guardes aquí. Puedes cambiarlo o borrarlo cuando quieras. Tus preferencias se usan en tus consultas y no se comparten con otros usuarios.</p><form id="personal-preferencias" class="card"><p><label><input type="checkbox" id="personal-sencillo" ${p.inicio_sencillo ? 'checked' : ''}> Usar el inicio sencillo</label></p><label for="personal-notas">Cómo quieres que te ayude</label><textarea id="personal-notas" rows="5" maxlength="1000" placeholder="Por ejemplo: respuestas cortas, con precios y fechas claros">${h(p.notas_ia || '')}</textarea><p class="mut">No guardes contraseñas. Los precios y las deudas siempre se consultan en Sage.</p><div class="row"><button class="btn">Guardar preferencias</button><button class="btn sec" type="button" id="personal-olvidar">Borrar recuerdos</button></div></form><div class="card" id="personal-vocabulario"></div><p><a href="#/">Volver al inicio</a></p>`
+      let voc = Array.isArray(p.vocabulario) ? p.vocabulario : []
+      const pintarVoc = () => {
+        $('#personal-vocabulario').innerHTML = `<h2>Cómo hablas</h2><p class="mut">Lo que la IA ha aprendido de cómo llamas a clientes, proveedores y vinos. Solo lo usa contigo.</p>` + (voc.length
+          ? `<ul class="list">${voc.map((x, i) => `<li>«${h(x?.dice || '')}» → ${h(x?.es || '')} <button class="btn sec" type="button" data-voc="${i}" aria-label="Olvidar">✕</button></li>`).join('')}</ul><button class="btn sec" type="button" id="personal-voc-todo">Olvidar todo</button>`
+          : '<p>Todavía no ha aprendido nada.</p>')
+      }
+      const guardarVoc = async (nuevo) => {
+        try { await api('tn_preferencias?on_conflict=user_id', 'POST', { user_id: usuario, vocabulario: nuevo, actualizado: new Date().toISOString() }); voc = nuevo; if (usuario === uid()) Nube.preferencias = { ...(Nube.preferencias || {}), vocabulario: nuevo }; pintarVoc(); toast('Olvidado') } catch (err) { avisoError(err) }
+      }
+      pintarVoc()
+      $('#personal-vocabulario').onclick = (e) => {
+        const b = e.target.closest('button'); if (!b) return
+        if (b.id === 'personal-voc-todo') { if (confirm('¿Olvidar todo lo aprendido?')) guardarVoc([]) } else if (b.dataset.voc) guardarVoc(voc.filter((_, i) => i !== Number(b.dataset.voc)))
+      }
       $('#personal-olvidar').onclick = () => { $('#personal-notas').value = ''; $('#personal-preferencias').requestSubmit() }
       $('#personal-preferencias').onsubmit = async (e) => {
         e.preventDefault(); const boton = e.target.querySelector('button'); boton.disabled = true
         const datos = { user_id: usuario, inicio_sencillo: $('#personal-sencillo').checked, notas_ia: $('#personal-notas').value.trim(), actualizado: new Date().toISOString() }
-        try { await api('tn_preferencias?on_conflict=user_id', 'POST', datos); if (usuario === uid()) Nube.preferencias = datos; toast('Preferencias guardadas') } catch (err) { avisoError(err) } finally { boton.disabled = false }
+        try { await api('tn_preferencias?on_conflict=user_id', 'POST', datos); if (usuario === uid()) Nube.preferencias = { ...(Nube.preferencias || {}), ...datos }; toast('Preferencias guardadas') } catch (err) { avisoError(err) } finally { boton.disabled = false }
       }
     } catch (e) { if (usuario === uid()) $('#main').innerHTML = '<p>No se pudieron cargar las preferencias. Comprueba la conexión y vuelve a intentarlo.</p>' }
   }
