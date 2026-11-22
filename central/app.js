@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.6.0'
+const VERSION = '1.6.1'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -562,6 +562,11 @@ const nomM = (t, c) => (c ? MAE?.[t]?.[c] || c : '')
 const opcM = (t, filtro = () => true) => Object.entries(MAE?.[t] || {}).filter(([c, n]) => filtro(c, n) && !/no usar/i.test(n)).sort((a, b) => a[0].localeCompare(b[0])).map(([c, n]) => [c, c + ' · ' + n])
 const fec = (d) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '')
 const limpio = (t) => String(t || '').replace(/[,()*%"\\:.]/g, ' ').trim().split(/\s+/).filter(Boolean).join('*')
+const qArt = (t) => {
+  const l = limpio(t); if (!l) return ''
+  const n = l.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split('*').map((w) => ({ crianza: 'cr*za', reserva: 'r*va' })[w] || w).join('*')
+  return `&or=(nombre_n.ilike.*${encodeURIComponent(n)}*,cod.ilike.*${encodeURIComponent(l)}*,ean.ilike.*${encodeURIComponent(l)}*)`
+}
 const qOr = (cols, t) => (limpio(t) ? `&or=(${cols.map((c) => `${c}.ilike.*${encodeURIComponent(limpio(t))}*`).join(',')})` : '')
 const eq = (c, v) => (v ? `&${c}=eq.${encodeURIComponent(v)}` : '')
 const dias = (d) => Math.floor((Date.now() - new Date(d)) / 864e5)
@@ -625,7 +630,7 @@ const DATOS = {
   precios: {
     filtros: () => [['q', 'q', 'Vino o artículo: nombre, código o código de barras'], ['familia', 'sel', 'Todas las familias', opcM('familia')], ['stock', 'sel', 'Con y sin stock', [['si', 'Solo con stock']]]],
     def: {},
-    path: (f) => 'sage_articulos?baja=is.false' + qOr(['nombre', 'cod', 'ean'], f.q) + eq('familia', f.familia),
+    path: (f) => 'sage_articulos?baja=is.false' + qArt(f.q) + eq('familia', f.familia),
     sel: 'cod,nombre,familia,pvp,ean,ubicacion', resSel: 'cod',
     ord: () => 'nombre.asc',
     resumen: (l) => stat(l.length, 'artículos'),
