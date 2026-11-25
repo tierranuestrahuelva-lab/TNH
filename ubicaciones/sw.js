@@ -1,4 +1,4 @@
-const CACHE = 'tn-ubic-v1'
+const CACHE = 'tn-ubic-v2'
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
 self.addEventListener('fetch', (e) => {

@@ -170,3 +170,5 @@ ol li,ul li{margin:4px 0}
 .facil-truco{font-size:16px;color:#6f6268;background:#f4e9ef;border-radius:12px;padding:12px 14px}
 a.personal-tarjeta{text-decoration:none}
 @media(max-width:520px){.facil-mic{width:180px;height:180px}.facil-a{font-size:22px}.facil[data-letra="1"] .facil-a{font-size:27px}.facil[data-letra="2"] .facil-a{font-size:32px}}
+.art .ubi{margin-top:4px;font-size:.95em;color:#7a1f2b}
+.card.cb s{color:#888}

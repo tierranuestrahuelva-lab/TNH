@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.7.2'
+const VERSION = '1.8.0'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -20,6 +20,7 @@ const ICON = {
   whatsapp: '<path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/>',
   comerciales: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20"/>',
   ubicaciones: '<path d="M12 22s7-6.3 7-12a7 7 0 0 0-14 0c0 5.7 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+  cambios: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
   preparar: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   croquis: '<path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3z"/><path d="M9 3v15M15 6v15"/>',
   horarios: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M10 2h4"/>',
@@ -59,6 +60,7 @@ const MODULOS = [
   { id: 'whatsapp', p: 'ventas', g: 'pedidos', n: 'Pedidos WhatsApp', d: 'Pedidos del chatbot (en Reparto › Oficina › WhatsApp)', url: '../reparto/' },
   { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Enviar catálogos sin precios y consultar clientes y pedidos', url: '../reparto/' },
   { id: 'ubicaciones', p: 'almacen', g: 'almacen', n: 'Ubicaciones', d: 'Dónde está cada vino: nicheros, almacén y nave', url: '../ubicaciones/' },
+  { id: 'cambios', p: 'almacen', g: 'almacen', r: '#/cambios', n: 'Cambios de ubicaciones', d: 'Repasar y borrar los cambios ya pasados a Sage' },
   { id: 'preparar', p: 'almacen', g: 'almacen', n: 'Preparar pedidos', d: 'Picking con lector y voz, bultos y carga (perfil Almacén)', url: '../reparto/' },
   { id: 'horarios', p: null, g: 'equipo', n: 'Horarios y fichajes', d: 'Turnos, fichar entrada/salida y solicitudes', url: '../horarios/' },
   { id: 'redes', p: 'marketing', g: 'marketing', n: 'Redes sociales', d: 'Publicaciones e historias de la semana', url: '../redes/2026-11-s1/' },
@@ -66,7 +68,7 @@ const MODULOS = [
 // las tres entradas de Reparto son la misma app: se comparte un solo marco
 const marcoDe = (m) => (m.url === '../reparto/' ? 'reparto' : m.id)
 const MOD = Object.fromEntries(MODULOS.map((m) => [m.id, m]))
-const enlace = (m) => (m.v ? '#/v/' : '#/m/') + m.id
+const enlace = (m) => m.r || (m.v ? '#/v/' : '#/m/') + m.id
 const ROLES = { gerente: 'Gerente', oficina: 'Oficina', comercial: 'Comercial', dependienta: 'Dependienta', almacen: 'Almacén', repartidor: 'Repartidor' }
 const AREAS = [['ventas', 'Ventas y clientes'], ['compras', 'Compras'], ['cartera', 'Cartera de cobros y pagos'], ['tpv', 'TPV tienda'], ['almacen', 'Almacén y stock'], ['reparto', 'Reparto'], ['contabilidad', 'Contabilidad'], ['equipo', 'Equipo y horarios'], ['marketing', 'Web y redes'], ['ia', 'IA acompañante']]
 
@@ -121,7 +123,7 @@ const Nube = {
     if (!(await this.renovar())) throw new Error('sin sesión')
     const r = await fetch(SUPA.url + '/rest/v1/' + path, { method: metodo, headers: { apikey: SUPA.key, Authorization: 'Bearer ' + this.token.access_token, 'Content-Type': 'application/json', Prefer: 'return=minimal' + (path.includes('on_conflict=') ? ',resolution=merge-duplicates' : '') }, body: datos === undefined ? undefined : JSON.stringify(datos) })
     if (!r.ok) throw new Error(await r.text())
-    return r.status === 204 || r.status === 201 ? null : r.json()
+    const t = await r.text(); return t ? JSON.parse(t) : null
   },
   async lista(path, desde = 0, n = 100) {
     if (!(await this.renovar())) throw new Error('sin sesión')
@@ -206,6 +208,22 @@ function pintarNube() {
 
 // ---------- buscador de artículos (datos de Sage publicados en la Guía) ----------
 let ARTS = null
+const RELLENO = new Set('donde esta estan ubicacion ubicado ubicada se encuentra precio precios cuanto cuesta vale stock quedan hay tiene tenemos que el la los las un una del dime dame busca buscar'.split(' '))
+const ES_PREGUNTA = /\b(donde|ubicacion|ubicad[oa]|precio|cuanto|cuesta|vale|stock|quedan|hay|debe|deben|pagar|pedidos?|albaran|cobr\w*|tarifa|que|quien|como|cuando)\b/
+// ubicaciones actuales de la app Ubicaciones (c → {u, v}), para enseñarlas en el buscador
+let UBI = null
+async function cargarUbicaciones() {
+  if (UBI || !P.personal || !P.ve('almacen')) return UBI
+  if (cargarUbicaciones.p) return cargarUbicaciones.p
+  return (cargarUbicaciones.p = (async () => {
+    const m = new Map()
+    for (let o = 0; ; o += 1000) {
+      const l = await Nube.api(`articulos?select=c,u,v&or=(u.neq.,v.neq.)&order=c&limit=1000&offset=${o}`)
+      l.forEach((x) => m.set(x.c, x)); if (l.length < 1000) break
+    }
+    return (UBI = m)
+  })().catch(() => { cargarUbicaciones.p = null; return null }))
+}
 function cargarArticulos() {
   if (ARTS) return Promise.resolve(ARTS)
   if (cargarArticulos.p) return cargarArticulos.p
@@ -224,8 +242,9 @@ function buscar(q) {
     const exacto = ARTS.filter((a) => a.c === q || String(10000000 + +a.c) === q || (a.b || []).includes(q) || (a.b || []).some((b) => b.length === 14 && b.slice(1) === q))
     if (exacto.length) return exacto
   }
-  const t = norm(q).split(/\s+/).filter(Boolean)
-  const q0 = norm(q)
+  const t = norm(q).replace(/[¿?¡!,.]/g, ' ').split(/\s+/).filter((x) => x && !RELLENO.has(x))
+  if (!t.length) return []
+  const q0 = t.join(' ')
   return ARTS.filter((a) => t.every((x) => a._t.includes(x))).sort((x, y) => (norm(y.n).startsWith(q0) - norm(x.n).startsWith(q0)) || (x.n.length - y.n.length)).slice(0, 40)
 }
 function dictar(cb) {
@@ -256,6 +275,7 @@ const conIA = () => P.personal && P.ve('ia')
 function tarjeta(a) {
   const foto = '<div class="ph">' + SVG('vino') + (a.im ? ' <img loading="lazy" src="../vinos/img/' + (10000000 + +a.c) + '.jpg" alt="" onerror="this.remove()">' : '') + '</div>'
   return `<div class="art">${foto}<div class="g"><div class="n">${h(a.n)}</div><div class="mut">Cód. ${h(a.c)}${a.d ? ' · ' + h(a.d) : ''}${a.o ? ' · ' + h(a.o) : ''}</div>
+    ${UBI ? (() => { const u = UBI.get(String(a.c)); return u && (u.u || u.v) ? `<div class="ubi">📍 ${u.u ? 'Tienda: <b>' + h(u.u) + '</b>' : ''}${u.u && u.v ? ' · ' : ''}${u.v ? 'Nave: <b>' + h(u.v) + '</b>' : ''}</div>` : '<div class="mut">📍 Sin ubicación apuntada</div>' })() : ''}
     <div class="acc"><a class="btn sm" href="#/m/guia/vino/${encodeURIComponent(a.c)}">Ficha</a><a class="btn sm sec" href="#/m/ubicaciones">Ubicación</a><a class="btn sm sec" href="#/m/tpv">Vender</a></div></div>
     <div class="p">${a.p ? eur(a.p / 100) : ''}</div></div>`
 }
@@ -328,12 +348,17 @@ function vistaInicio() {
     const v = q.value.trim()
     if (!v) { res.innerHTML = ''; return }
     if (!ARTS) { res.innerHTML = '<div class="mut">Cargando catálogo…</div>'; cargarArticulos().then(pinta, () => (res.innerHTML = '<div class="mut">No se pudo cargar el catálogo. Compruebe la conexión.</div>')); return }
+    if (!UBI && P.personal && P.ve('almacen') && !cargarUbicaciones.p) cargarUbicaciones().then((x) => x && q.value.trim() && pinta())
     const l = buscar(v)
     res.innerHTML = l.length ? l.map(tarjeta).join('') + (l.length === 40 ? '<div class="mut">Mostrando los 40 primeros: escriba algo más para afinar.</div>' : '') : '<div class="mut">Ningún artículo coincide.</div>'
   }
   q.oninput = pinta
   const poner = (t) => { q.value = t; sessionStorage.setItem('tn-central-q', t); pinta() }
-  $('#q-mic').onclick = () => dictar(poner)
+  // hablando: si es una pregunta («¿dónde está…?», «¿qué debe…?») contesta la IA, y debajo salen los vinos con su ubicación
+  $('#q-mic').onclick = () => dictar((t) => {
+    poner(t)
+    if (conIA() && ES_PREGUNTA.test(norm(t))) { if ($('#ia').hidden) abrirIA(); preguntar(t) }
+  })
   $('#q-cam').onclick = () => lectorCodigo(poner)
   if ($('#q-ia')) $('#q-ia').onclick = abrirIA
   q.onfocus = () => cargarArticulos().catch(() => {})
@@ -451,6 +476,59 @@ function vistaCuenta() {
   }
   $('#b-salir').onclick = () => { Nube.salir(); EST = null; pintarNube(); pintarUsuario(); location.hash = '#/' }
 }
+// ---------- historial de cambios de Ubicaciones: borrar lo ya pasado a Sage ----------
+// Solo se borra el historial (tabla cambios). La ubicación actual (tabla articulos) y Sage no se tocan.
+// «cambiosBorrados» en meta avisa a los móviles con la app Ubicaciones para que no vuelvan a subir lo borrado.
+async function vistaCambios() {
+  cerrarModulo(); V.sage = false; V.vista = 'cambios'; dock()
+  const main = $('#main')
+  if (!P.ve('almacen')) { main.innerHTML = '<h1>Cambios de ubicaciones</h1><div class="card">Su puesto no tiene acceso a Ubicaciones.</div>'; return }
+  const puede = P.gerente || !!Nube.perfil?.perms?.some((x) => x.modulo === 'almacen' && x.editar)
+  main.innerHTML = '<h1>Cambios de ubicaciones</h1><div class="mut">Cargando…</div>'
+  let l = []
+  try { l = await Nube.api('cambios?select=id,t,usuario,c,n,campo,antes,despues&order=t.desc&limit=2000') } catch (e) { main.innerHTML = '<h1>Cambios de ubicaciones</h1><div class="card">No se pudo cargar: ' + h(e.message) + '</div>'; return }
+  const fecha = (t) => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  main.innerHTML = `<h1>Cambios de ubicaciones</h1>
+    <div class="card"><div class="mut">Cuando ya haya pasado los cambios a Sage, bórrelos de aquí, uno a uno o todos. <b>Borrar solo quita el aviso del historial:</b> la ubicación del vino no cambia y en Sage no se toca nada.</div>
+    <div class="row" style="margin-top:10px"><button class="btn sec" id="cb-act">↻ Actualizar</button>${puede && l.length ? `<button class="btn" id="cb-todo" style="background:#b3261e">Borrar todos (${l.length})</button>` : ''}</div>
+    ${puede ? '' : '<div class="mut" style="margin-top:8px">Solo el gerente o quien edita almacén puede borrarlos.</div>'}</div>
+    ${l.length ? l.map((x, i) => `<div class="card cb"><div class="mut">${fecha(x.t)} · ${h(x.usuario || '')}</div><b>${h(x.n || x.c)}</b> <span class="mut">(${h(x.c)})</span>
+      <div>${h(x.campo || '')}: <s>${h(x.antes || 'vacío')}</s> → <b>${h(x.despues || 'vacío')}</b></div>
+      ${puede ? `<button class="btn sm sec" data-cb="${i}" style="margin-top:6px">🗑 Borrar</button>` : ''}</div>`).join('') : '<div class="card">No hay cambios pendientes. Todo limpio.</div>'}`
+  $('#cb-act').onclick = vistaCambios
+  const avisar = async (f) => {
+    const m = await Nube.api('meta?select=v&k=eq.cambiosBorrados')
+    let b = {}; try { b = JSON.parse(m[0]?.v || '{}') || {} } catch (e) {}
+    f(b); b.ids = (b.ids || []).slice(-500)
+    await Nube.api('meta?on_conflict=k', 'POST', [{ k: 'cambiosBorrados', v: JSON.stringify(b) }])
+  }
+  const comprobar = async (filtro, n) => {
+    const r = await Nube.api('cambios?select=id&' + filtro)
+    toast(r.length ? 'No se ha podido borrar: su puesto no tiene permiso.' : n === 1 ? 'Cambio borrado del historial.' : `${n} cambios borrados del historial.`, 3500)
+    vistaCambios()
+  }
+  $$('[data-cb]', main).forEach((bt) => (bt.onclick = async () => {
+    const x = l[+bt.dataset.cb]
+    if (!confirm(`¿Está seguro de borrar este cambio del historial?\n\n${x.n || x.c}\n${x.campo}: ${x.antes || 'vacío'} → ${x.despues || 'vacío'}\n\nLa ubicación actual no cambia.`)) return
+    bt.disabled = true
+    try {
+      await avisar((b) => (b.ids = [...(b.ids || []), x.id]))
+      await Nube.api('cambios?id=eq.' + encodeURIComponent(x.id), 'DELETE')
+      await comprobar('id=eq.' + encodeURIComponent(x.id), 1)
+    } catch (e) { bt.disabled = false; toast('No se pudo borrar: ' + e.message, 4000) }
+  }))
+  if ($('#cb-todo')) $('#cb-todo').onclick = async () => {
+    if (!confirm(`¿Está seguro de borrar TODOS los ${l.length} cambios del historial?\n\nHágalo solo si ya los ha pasado a Sage. Las ubicaciones actuales no cambian.`)) return
+    if (!confirm('Última comprobación: se borrarán ' + l.length + ' cambios y no se pueden recuperar. ¿Seguro?')) return
+    const hasta = l[0].t, ids = l.map((x) => x.id)
+    try {
+      await avisar((b) => { if (!b.hasta || new Date(hasta) > new Date(b.hasta)) b.hasta = hasta })
+      for (let i = 0; i < ids.length; i += 100) await Nube.api('cambios?id=in.(' + ids.slice(i, i + 100).map((x) => '"' + x + '"').join(',') + ')', 'DELETE')
+      await comprobar('t=lte.' + encodeURIComponent(hasta) + '&limit=1', ids.length)
+    } catch (e) { toast('No se pudo borrar: ' + e.message, 4000) }
+  }
+}
+
 async function vistaEquipo() {
   cerrarModulo(); V.sage = false; V.vista = 'equipo'; dock()
   if (!P.gerente) { $('#main').innerHTML = '<h1>Equipo</h1><div class="card">Solo el gerente puede gestionar usuarios y permisos.</div>'; return }
@@ -721,6 +799,7 @@ function ruta() {
   if (hs.startsWith('#/equipo')) return vistaEquipo()
   if (hs.startsWith('#/cuenta')) return vistaCuenta()
   if (hs === '#/personal') return Personal.preferencias()
+  if (hs === '#/cambios') return vistaCambios()
   if (hs === '#/miscompras') return Personal.compras()
   vistaInicio()
 }
