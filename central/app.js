@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.8.1'
+const VERSION = '1.8.2'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -53,8 +53,8 @@ const MODULOS = [
   { id: 'clientes', c: 'Clientes', p: 'ventas', g: 'gestion', v: 1, n: 'Clientes', d: 'Fichas de Sage por vendedor, ruta y tarifa' },
   { id: 'precios', c: 'Precios', p: 'almacen', g: 'gestion', v: 1, n: 'Precios y stock', d: 'Tarifas, stock de tienda y nave, y lotes' },
   { id: 'tpv', p: 'tpv', g: 'venta', n: 'TPV tienda', d: 'Cobrar en tienda con lector, cámara y ticket', url: '../tpv/' },
-  { id: 'guia', p: null, g: 'venta', n: 'Guía de vinos', d: 'Fichas, precios PVP y asistente para el mostrador', url: '../guia/' },
-  { id: 'vinos', p: null, g: 'venta', n: 'Web de vinos', d: 'Tienda online para clientes', url: '../vinos/' },
+  { id: 'guia', p: null, no: ['repartidor', 'almacen'], g: 'venta', n: 'Guía de vinos', d: 'Fichas, precios PVP y asistente para el mostrador', url: '../guia/' },
+  { id: 'vinos', p: null, no: ['repartidor', 'almacen'], g: 'venta', n: 'Web de vinos', d: 'Tienda online para clientes', url: '../vinos/' },
   { id: 'club', p: 'ventas', g: 'venta', n: 'Club de Vinos', d: 'Altas de socios y exportación a Sage', url: '../club/' },
   { id: 'reparto', p: 'reparto', g: 'pedidos', n: 'Reparto y oficina', d: 'Albaranes de Sage, rutas, entregas y cobros', url: '../reparto/' },
   { id: 'whatsapp', p: 'ventas', g: 'pedidos', n: 'Pedidos WhatsApp', d: 'Pedidos del chatbot (en Reparto › Oficina › WhatsApp)', url: '../reparto/' },
@@ -155,7 +155,7 @@ const P = {
   get gerente() { return Nube.perfil?.rol === 'gerente' },
   get comercial() { return this.personal && Nube.perfil.rol === 'comercial' },
   ve(area) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return p.rol === 'gerente' || p.perms.some((x) => x.modulo === area && x.ver) },
-  app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; return !m.p || this.ve(m.p) },
+  app(m) { const p = Nube.perfil; if (!p) return !Nube.token || Nube.token.user?.email === SUPA.email; if (p.sinPuesto) return false; if (m.no?.includes(p.rol)) return false; return !m.p || this.ve(m.p) },
 }
 const Personal = window.TNPersonal({ Nube, P, $, h, SVG, toast, pintarEstado, abrirIA, preguntar,
   apps: () => ['comerciales', 'horarios', 'tpv', 'guia'].filter((id) => MOD[id] && P.app(MOD[id])).map((id) => ({ id, n: MOD[id].n, d: MOD[id].d, href: '#/m/' + id })),
