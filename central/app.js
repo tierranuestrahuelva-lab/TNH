@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.8.0'
+const VERSION = '1.8.1'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -58,7 +58,7 @@ const MODULOS = [
   { id: 'club', p: 'ventas', g: 'venta', n: 'Club de Vinos', d: 'Altas de socios y exportación a Sage', url: '../club/' },
   { id: 'reparto', p: 'reparto', g: 'pedidos', n: 'Reparto y oficina', d: 'Albaranes de Sage, rutas, entregas y cobros', url: '../reparto/' },
   { id: 'whatsapp', p: 'ventas', g: 'pedidos', n: 'Pedidos WhatsApp', d: 'Pedidos del chatbot (en Reparto › Oficina › WhatsApp)', url: '../reparto/' },
-  { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Enviar catálogos sin precios y consultar clientes y pedidos', url: '../reparto/' },
+  { id: 'comerciales', p: 'ventas', g: 'pedidos', n: 'Comerciales', d: 'Visitas a clientes, catálogos sin precios, clientes y pedidos', url: '../reparto/' },
   { id: 'ubicaciones', p: 'almacen', g: 'almacen', n: 'Ubicaciones', d: 'Dónde está cada vino: nicheros, almacén y nave', url: '../ubicaciones/' },
   { id: 'cambios', p: 'almacen', g: 'almacen', r: '#/cambios', n: 'Cambios de ubicaciones', d: 'Repasar y borrar los cambios ya pasados a Sage' },
   { id: 'preparar', p: 'almacen', g: 'almacen', n: 'Preparar pedidos', d: 'Picking con lector y voz, bultos y carga (perfil Almacén)', url: '../reparto/' },
@@ -398,7 +398,7 @@ function vistaComerciales() {
     $('#main').innerHTML = '<h1>Comerciales</h1><div class="card">Entre con su correo y contraseña en <a href="#/sage">Mi cuenta</a> para ver sus catálogos y clientes.</div>'
     return
   }
-  $('#main').innerHTML = `<p class="com-kicker">Material para sus clientes</p><h1>Enviar catálogo</h1><p class="mut">Elija el catálogo. Los dos son <b>sin precios</b>.</p>
+  $('#main').innerHTML = `${puedeVisitar() ? '<section id="visitas" class="vis" aria-labelledby="vis-t"><h1 id="vis-t">Mis visitas</h1><div class="mut">Cargando…</div></section>' : ''}<p class="com-kicker">Material para sus clientes</p><h1>Enviar catálogo</h1><p class="mut">Elija el catálogo. Los dos son <b>sin precios</b>.</p>
     <div class="com-catalogos">${CATALOGOS.map((c) => {
       const url = new URL('catalogos/' + c.archivo, location.href).href
       const mensaje = `Le comparto el catálogo de hostelería de Tierra Nuestra, ${c.nombre.toLowerCase()}, sin precios.\n${url}`
@@ -407,6 +407,7 @@ function vistaComerciales() {
     <div class="com-aviso"><b>Los precios, aparte.</b> Estos botones solo envían el PDF sin precios, nunca sus tarifas ni datos de clientes. Las versiones con precios por cliente aún no están habilitadas aquí. Un PDF enviado se puede reenviar; no se puede retirar después.</div>
     <h2>Mi trabajo · Uso interno</h2><div class="grid">${['clientes', 'ventas', 'precios'].filter((id) => P.app(MOD[id])).map((id) => `<a class="mod" href="${enlace(MOD[id])}"><div class="e">${SVG(id)}</div><b>${h(MOD[id].n)}</b><span>${h(MOD[id].d)}</span></a>`).join('')}</div>
     <details class="com-anterior"><summary>Herramienta anterior de clientes y pedidos</summary><p>Puede seguir preparando pedidos como hasta ahora. Esta herramienta muestra tarifas y sus PDF pueden llevar precios. Para enviar un catálogo sin precios, use los botones de arriba.</p><a class="btn sec" href="#/m/comerciales/pedidos">Abrir clientes y pedidos</a></details><p class="mut">Las consultas internas pueden mostrar importes. No las comparta como catálogo.</p>`
+  if (puedeVisitar()) pintarVisitas()
   $$('[data-compartir]').forEach((b) => (b.onclick = async () => {
     const c = CATALOGOS.find((x) => x.id === b.dataset.compartir)
     const url = new URL('catalogos/' + c.archivo, location.href).href
@@ -416,6 +417,85 @@ function vistaComerciales() {
       else toast('Use «Enviar por WhatsApp» o «Descargar PDF».', 5000)
     } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir. Use «Enviar por WhatsApp» o «Descargar PDF».', 5000) }
   }))
+}
+const puedeVisitar = () => P.personal && ['gerente', 'oficina', 'comercial'].includes(Nube.perfil?.rol)
+const masDias = (n) => new Date(Date.now() + n * 864e5).toLocaleDateString('sv-SE')
+const lugarVisita = (v) => (v.lat != null && v.lng != null ? v.lat + ',' + v.lng : [v.cliente_nombre, v.poblacion].filter(Boolean).join(', '))
+const mapaVisita = (v) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(lugarVisita(v))
+function rutaVisitas(l) {
+  const sitios = l.map(lugarVisita).filter(Boolean).slice(0, 10)
+  if (!sitios.length) return ''
+  const dest = sitios.pop()
+  return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(dest) + (sitios.length ? '&waypoints=' + encodeURIComponent(sitios.join('|')) : '')
+}
+async function pintarVisitas() {
+  const sec = $('#visitas'); if (!sec) return
+  let todas, nombres = {}
+  try {
+    todas = await Nube.api('tn_visitas?select=id,user_id,cliente,cliente_nombre,poblacion,fecha,nota,proxima,lat,lng&order=fecha.desc&limit=1000')
+    if (oficina()) (await Nube.api('tn_perfiles?select=user_id,nombre').catch(() => [])).forEach((x) => (nombres[x.user_id] = x.nombre))
+  } catch (e) { sec.innerHTML = '<h1 id="vis-t">Mis visitas</h1><div class="card mut">Las visitas aún no están disponibles. Avise a la oficina.</div>'; return }
+  if (!sec.isConnected) return
+  const yo = Nube.token?.user?.id, equipo = oficina() && todas.some((v) => v.user_id !== yo)
+  const ultima = {}
+  todas.forEach((v) => { const k = v.user_id + '|' + v.cliente; if (!ultima[k]) ultima[k] = v })
+  const pend = Object.values(ultima).filter((v) => v.proxima).sort((a, b) => a.proxima.localeCompare(b.proxima))
+  const toca = pend.filter((v) => v.proxima <= hoy() && v.user_id === yo)
+  const quien = (v) => (equipo && nombres[v.user_id] ? ' · ' + h(nombres[v.user_id]) : '')
+  const cuando = (d) => (d < hoy() ? `<span class="tag warn">Atrasada · ${fec(d)}</span>` : d === hoy() ? '<span class="tag hoy">Hoy</span>' : `<span class="tag">${fec(d)}</span>`)
+  const ruta = rutaVisitas(toca)
+  sec.innerHTML = `<h1 id="vis-t">${equipo ? 'Visitas del equipo' : 'Mis visitas'}</h1>
+    <div class="vis-acciones"><button class="btn" type="button" id="vis-nueva">${SVG('comerciales')}Apuntar visita hecha</button>${ruta ? `<a class="btn sec" href="${h(ruta)}" target="_blank" rel="noopener">Ruta de hoy en Google Maps (${toca.length})</a>` : ''}</div>
+    <div id="vis-form"></div>
+    <h3>Pendientes de visitar</h3>
+    ${pend.length ? `<ul class="vis-lista">${pend.map((v) => `<li class="card"><div class="vis-cab">${cuando(v.proxima)}<b>${h(v.cliente_nombre || v.cliente)}</b><span class="mut">${h(v.poblacion)}${quien(v)}</span></div>${v.nota ? `<div class="mut">Última visita ${fec(v.fecha)}: ${h(v.nota)}</div>` : `<div class="mut">Última visita ${fec(v.fecha)}</div>`}<div class="vis-botones">${v.user_id === yo ? `<button class="btn sm" type="button" data-vis-hecha="${h(v.id)}">Visita hecha</button>` : ''}<a class="btn sm sec" href="${h(mapaVisita(v))}" target="_blank" rel="noopener">Ver en el mapa</a></div></li>`).join('')}</ul>` : '<div class="card mut">No hay visitas pendientes. Al apuntar una visita, elija cuándo volver y aparecerá aquí.</div>'}
+    ${todas.length ? `<details class="vis-hechas"><summary>Últimas visitas hechas (${Math.min(todas.length, 20)})</summary><ul>${todas.slice(0, 20).map((v) => `<li>${fec(v.fecha)} · <b>${h(v.cliente_nombre || v.cliente)}</b>${quien(v)}${v.nota ? ' — ' + h(v.nota) : ''}</li>`).join('')}</ul></details>` : ''}`
+  $('#vis-nueva').onclick = () => formVisita()
+  $$('[data-vis-hecha]', sec).forEach((b) => (b.onclick = () => { const v = todas.find((x) => x.id === b.dataset.visHecha); formVisita({ cod: v.cliente, nombre: v.cliente_nombre, poblacion: v.poblacion }) }))
+}
+function formVisita(cli) {
+  const caja = $('#vis-form'); if (!caja) return
+  let elegido = cli || null
+  caja.innerHTML = `<form class="card vis-f" id="vis-f"><h3>Visita hecha</h3>
+    <label>Cliente<input id="vis-q" type="search" autocomplete="off" placeholder="Escriba el nombre, código o población" value="${h(elegido ? elegido.nombre : '')}"></label><div id="vis-res"></div>
+    <label>Qué se habló (opcional)<textarea id="vis-nota" rows="3" maxlength="2000" placeholder="Pedido, vinos que le interesan, muestras…"></textarea></label>
+    <label>Volver a visitar<input id="vis-prox" type="date" min="${hoy()}"></label>
+    <div class="vis-botones">${[[7, 'En 1 semana'], [14, 'En 2 semanas'], [30, 'En 1 mes']].map(([n, t]) => `<button class="btn sm sec" type="button" data-dias="${n}">${t}</button>`).join('')}<button class="btn sm sec" type="button" data-dias="">Sin fecha</button></div>
+    <label class="vis-gps"><input id="vis-gps" type="checkbox" checked> Guardar dónde estoy ahora (para el mapa)</label>
+    <div class="vis-botones"><button class="btn" type="submit">Guardar visita</button><button class="btn sec" type="button" id="vis-cancelar">Cancelar</button></div></form>`
+  const q = $('#vis-q'), res = $('#vis-res')
+  let esp, turno = 0
+  q.oninput = () => {
+    elegido = null; clearTimeout(esp)
+    const t = ++turno
+    esp = setTimeout(async () => {
+      if (!limpio(q.value)) return (res.innerHTML = '')
+      try {
+        const l = await Nube.api('sage_clientes?select=cod,nombre,poblacion&cod=neq.' + qOr(['nombre', 'cod', 'poblacion'], q.value) + '&order=nombre.asc&limit=8')
+        if (t !== turno) return
+        res.innerHTML = l.length ? l.map((c, i) => `<button class="vis-cli" type="button" data-i="${i}"><b>${h(c.nombre)}</b> <span class="mut">${h(c.cod)} · ${h(c.poblacion)}</span></button>`).join('') : '<div class="mut">Ningún cliente coincide.</div>'
+        $$('.vis-cli', res).forEach((b) => (b.onclick = () => { elegido = l[b.dataset.i]; q.value = elegido.nombre; res.innerHTML = '' }))
+      } catch (e) { res.innerHTML = '<div class="mut ko">No se pudo buscar.</div>' }
+    }, 300)
+  }
+  $$('[data-dias]', caja).forEach((b) => (b.onclick = () => ($('#vis-prox').value = b.dataset.dias ? masDias(+b.dataset.dias) : '')))
+  $('#vis-cancelar').onclick = () => (caja.innerHTML = '')
+  $('#vis-f').onsubmit = async (e) => {
+    e.preventDefault()
+    if (!elegido) { toast('Elija el cliente de la lista'); return q.focus() }
+    const b = e.target.querySelector('[type=submit]'); b.disabled = true; b.textContent = 'Guardando…'
+    const datos = { cliente: elegido.cod, cliente_nombre: elegido.nombre || '', poblacion: elegido.poblacion || '', nota: $('#vis-nota').value.trim(), proxima: $('#vis-prox').value || null }
+    if ($('#vis-gps').checked && navigator.geolocation) {
+      const pos = await new Promise((ok) => navigator.geolocation.getCurrentPosition(ok, () => ok(null), { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }))
+      if (pos) { datos.lat = +pos.coords.latitude.toFixed(6); datos.lng = +pos.coords.longitude.toFixed(6) }
+    }
+    try {
+      await Nube.api('tn_visitas', 'POST', datos)
+      toast('Visita guardada' + (datos.proxima ? '. Volver el ' + fec(datos.proxima) : ''), 3500)
+      pintarVisitas()
+    } catch (err) { b.disabled = false; b.textContent = 'Guardar visita'; toast('No se pudo guardar la visita. Inténtelo de nuevo.', 5000) }
+  }
+  q.focus(); caja.scrollIntoView({ block: 'nearest' })
 }
 async function entrar(e) {
   e.preventDefault()
