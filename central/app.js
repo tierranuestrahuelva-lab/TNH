@@ -1,7 +1,7 @@
 /* TN Central · Tierra Nuestra — un solo enlace para todas las aplicaciones, conectadas a la base central alimentada por Sage 50 */
 (function () {
 'use strict'
-const VERSION = '1.7.1'
+const VERSION = '1.7.2'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -193,6 +193,7 @@ function semaforo() {
   const min = Math.round((Date.now() - at) / 60000)
   const hace = min < 1 ? 'hace un momento' : min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} días`
   const d = `Última lectura de Sage ${hace} (${at.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })})${EST.sage.base ? ' · empresa ' + EST.sage.base : ''}${EST.sage.equipo ? ' · desde ' + EST.sage.equipo : ''}`
+  if (EST.sage.error) return { c: 'ko', t: 'Sage 50: la copia de datos falla', d: d + '. Stock, precios y clientes pueden estar sin actualizar. Error: ' + String(EST.sage.error).slice(0, 160) }
   if (min <= 15) return { c: 'ok', t: 'Sage 50 conectado', d }
   if (min <= 24 * 60) return { c: 'warn', t: 'Sage 50 con retraso', d: d + '. ¿Está encendido el ordenador del conector?' }
   return { c: 'ko', t: 'Sage 50 sin sincronizar', d: d + '. Revise el ordenador donde está instalado el conector.' }
